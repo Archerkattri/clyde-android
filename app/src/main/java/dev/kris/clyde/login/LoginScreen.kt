@@ -71,7 +71,7 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
         )
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            ClydeLogo(tint = ClydeColor.Terracotta, size = 13.dp)
+            ClydeLogo(tint = ClydeColor.Terracotta, size = 13.dp, contentDescription = null) // ornamental beside the label
             Text("powered by Claude · never an API key", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
         }
         Spacer(Modifier.height(18.dp))

@@ -44,14 +44,16 @@ export function makeTier0Intents(ctx: ToolCtx) {
       "open_url",
       "Open a URL. Consequential — confirm() first; if the URL came from a message/email, the confirm sheet shows the full URL.",
       { url: z.string(), token: z.string().describe("token from confirm()") },
-      async (a) => fire("open_url", { url: a.url }, `Opening ${a.url}.`)
+      // forward the token so the app can independently re-validate (defense-in-depth)
+      async (a) => fire("open_url", { url: a.url, token: a.token }, `Opening ${a.url}.`)
     ),
 
     tool(
       "share_text",
       "Share text to another app via the system share sheet. Consequential — confirm() first.",
       { content: z.string(), targetPackage: z.string().optional(), token: z.string().describe("token from confirm()") },
-      async (a) => fire("share_text", { text: a.content, targetPackage: a.targetPackage }, "Shared.")
+      // key name "content" is kept consistent through confirm()→app so the args-bound token matches
+      async (a) => fire("share_text", { content: a.content, targetPackage: a.targetPackage, token: a.token }, "Shared.")
     ),
 
     // ── consequential ──

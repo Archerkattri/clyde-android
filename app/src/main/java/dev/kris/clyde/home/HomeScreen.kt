@@ -78,7 +78,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ClydeLogo(size = 28.dp)
+            ClydeLogo(size = 28.dp, contentDescription = null) // wordmark below announces "Clyde"
             Spacer(Modifier.size(10.dp))
             Row {
                 Text("Clyde", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 27.sp, letterSpacing = (-0.03).em, color = ClydeColor.Ink)
@@ -86,7 +86,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             }
             Spacer(Modifier.weight(1f))
             val statusText = when (online) { true -> "online"; false -> "brain offline"; null -> "…" }
-            val statusColor = if (online == true) ClydeColor.BlueDeep else ClydeColor.Muted
+            val statusColor = if (online == true) ClydeColor.BlueText else ClydeColor.Muted
             Text(statusText, fontFamily = Mono, fontSize = 11.sp, color = statusColor)
         }
         Spacer(Modifier.height(6.dp))
@@ -123,7 +123,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             }
             Text(
                 "Copy",
-                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
+                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText,
                 modifier = Modifier.pressable(label = "Copy brain key") {
                     val clip = ctx.getSystemService(ClipboardManager::class.java)
                     clip?.setPrimaryClip(ClipData.newPlainText("CLYDE_KEY", Prefs.clydeKey))
@@ -131,7 +131,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             )
             Text(
                 "Sync",
-                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
+                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText,
                 modifier = Modifier.pressable(label = "Sync key to Termux") {
                     val k = Prefs.clydeKey
                     TermuxRunCommand.runInTermux(
@@ -225,6 +225,6 @@ private fun CapabilityRow(name: String, status: String, live: Boolean, on: Boole
             color = if (on) ClydeColor.Ink else ClydeColor.Muted,
             modifier = Modifier.weight(1f),
         )
-        Text(status, fontFamily = Body, fontSize = 12.5f.sp, color = if (live) ClydeColor.BlueDeep else ClydeColor.Muted)
+        Text(status, fontFamily = Body, fontSize = 12.5f.sp, color = if (live) ClydeColor.BlueText else ClydeColor.Muted)
     }
 }

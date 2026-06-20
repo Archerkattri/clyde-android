@@ -21,14 +21,18 @@ class LocalControlServer(
     private val key: String,
     private val confirmHandler: (summary: String, details: String?, action: String, params: JSONObject) -> Pair<Boolean, String?>,
     private val overlayStatus: (text: String, state: String?) -> Unit,
-    private val consumeIntentToken: (token: String, action: String, body: JSONObject) -> Boolean,
+    // Non-destructive token check; the token is only burned (invalidate) after the action SUCCEEDS,
+    // so a denied permission or failed fire never costs the user a fresh approval.
+    private val validateIntentToken: (token: String, action: String, body: JSONObject) -> Boolean,
+    private val invalidateIntentToken: (token: String) -> Unit,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
         const val PORT = 8766
-        // Intents the app independently gates with a user-approved, one-time token —
-        // never trusting the brain to self-gate (defense-in-depth).
-        private val CONSEQUENTIAL_INTENTS = setOf("send_sms", "start_call", "add_calendar_event")
+        // Fail-closed allowlist: ONLY these intents fire without a user-approved token. Everything
+        // else (open_url, share_text, send_sms, start_call, add_calendar_event, and any future
+        // intent) is gated app-side, never trusting the brain to self-gate (defense-in-depth).
+        private val SAFE_INTENTS = setOf("launch_app", "set_alarm", "set_timer", "navigate_to")
     }
 
     override fun serve(session: IHTTPSession): Response {
@@ -57,17 +61,24 @@ class LocalControlServer(
                 }
                 uri.startsWith("/intent/") -> {
                     val name = uri.removePrefix("/intent/")
-                    if (name in CONSEQUENTIAL_INTENTS) {
-                        val token = body.optString("token")
-                        when {
-                            token.isBlank() || !consumeIntentToken(token, name, body) -> err("confirmation required: no valid token for $name")
-                            DeviceIntents.fire(ctx, name, body) -> ok(JSONObject().put("fired", name))
-                            else -> err("$name failed")
+                    val needPerm = DeviceIntents.missingPermissionFor(ctx, name)
+                    when {
+                        // distinct, recoverable error BEFORE touching the token, so it isn't burned
+                        needPerm != null -> err("$name needs the $needPerm permission — grant it in Clyde, then retry")
+                        name in SAFE_INTENTS ->
+                            if (DeviceIntents.fire(ctx, name, body)) ok(JSONObject().put("fired", name)) else err("$name failed")
+                        else -> {
+                            val token = body.optString("token")
+                            when {
+                                token.isBlank() || !validateIntentToken(token, name, body) ->
+                                    err("confirmation required: no valid token for $name")
+                                DeviceIntents.fire(ctx, name, body) -> {
+                                    invalidateIntentToken(token) // single-use: burn only on success
+                                    ok(JSONObject().put("fired", name))
+                                }
+                                else -> err("$name failed") // token preserved — user can retry without re-approving
+                            }
                         }
-                    } else if (DeviceIntents.fire(ctx, name, body)) {
-                        ok(JSONObject().put("fired", name))
-                    } else {
-                        err("$name failed")
                     }
                 }
                 uri == "/speak" -> { voice.speak(body.optString("text")); ok(JSONObject()) }
@@ -86,8 +97,11 @@ class LocalControlServer(
                 uri == "/gemini/delegate" -> {
                     val token = body.optString("token")
                     when {
-                        token.isBlank() || !consumeIntentToken(token, "delegate_to_gemini", body) -> err("confirmation required: no valid token for gemini")
-                        GeminiRouter.delegate(ctx, body.optString("prompt")) -> ok(JSONObject().put("delegated", true))
+                        token.isBlank() || !validateIntentToken(token, "delegate_to_gemini", body) -> err("confirmation required: no valid token for gemini")
+                        GeminiRouter.delegate(ctx, body.optString("prompt")) -> {
+                            invalidateIntentToken(token)
+                            ok(JSONObject().put("delegated", true))
+                        }
                         else -> err("gemini failed")
                     }
                 }

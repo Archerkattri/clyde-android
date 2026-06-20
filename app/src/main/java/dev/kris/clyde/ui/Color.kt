@@ -26,7 +26,8 @@ object ClydeColor {
 
     // complement
     val Blue = Color(0xFF56C1DE)
-    val BlueDeep = Color(0xFF2E89A6)
+    val BlueDeep = Color(0xFF2E89A6) // fills / icons / dots (3:1 affordances) — NOT small text
+    val BlueText = Color(0xFF1C7088) // AA-compliant (>=4.5:1 on Paper & Panel2) blue for small text labels
     val BlueTint = Color(0xFFE4F2F7)
 
     // tier ramp: cool → hot (safe → root/danger)

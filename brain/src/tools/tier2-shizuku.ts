@@ -10,6 +10,12 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
     return r.ok ? text(r.stdout.trim() || "ok") : err(r.stderr.trim() || `exit ${r.code}`);
   };
 
+  // Single-quote-escape UNTRUSTED text before it enters the device shell string. `rish -c "<cmd>"`
+  // runs through a shell, so $(...), backticks and $VAR stay live inside double quotes — and the
+  // model routinely types screen-derived (untrusted) text via input_text. Single quotes disable
+  // all of it; the only escape needed is for a literal single quote.
+  const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
   return [
     tool(
       "shell",
@@ -23,7 +29,7 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
     ),
 
     tool("input_tap", "Tap screen coordinates via ADB input.", { x: z.number().int(), y: z.number().int() }, async (a) => run(`input tap ${a.x} ${a.y}`)),
-    tool("input_text", "Type text via ADB input.", { text: z.string() }, async (a) => run(`input text ${JSON.stringify(a.text)}`)),
+    tool("input_text", "Type text via ADB input.", { text: z.string() }, async (a) => run(`input text ${sq(a.text)}`)),
     tool("input_key", "Send a key event via ADB input.", { keycode: z.union([z.number().int(), z.string()]) }, async (a) => run(`input keyevent ${a.keycode}`)),
     tool("uiautomator_dump", "Dump the UI hierarchy via uiautomator (when the accessibility tree is awkward).", {}, async () => run("uiautomator dump /sdcard/clyde_dump.xml >/dev/null 2>&1; cat /sdcard/clyde_dump.xml")),
     tool("screencap", "Capture the screen via screencap (returns image for vision).", {}, async () => {
@@ -48,7 +54,7 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
       async (a) => {
         const g = gate(ctx, "settings_put", a);
         if (g) return g;
-        return run(`settings put ${a.namespace} ${a.key} ${JSON.stringify(a.value)}`);
+        return run(`settings put ${a.namespace} ${sq(a.key)} ${sq(a.value)}`);
       }
     ),
     tool("app_disable", "Disable an app for the current user. Consequential.", { pkg: z.string(), token: z.string() }, async (a) => {

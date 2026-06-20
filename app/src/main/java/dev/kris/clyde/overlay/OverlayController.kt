@@ -116,10 +116,11 @@ class OverlayController(private val appCtx: Context) :
         if (ui.value.clawd == ClawdState.Success) ui.value = ui.value.copy(clawd = ClawdState.Idle)
     }
 
-    /** Single-use, action+args-bound, TTL consume: the intent the app is about to fire must
-     *  match the approved action AND the approved params (independent of what the brain claims). */
-    fun consumeIssuedToken(token: String, action: String, body: JSONObject): Boolean {
-        val t = issuedTokens.remove(token) ?: return false
+    /** Non-destructive, action+args-bound, TTL check: does this token authorize firing (action, body)?
+     *  The intent must match the approved action AND the approved params (independent of the brain).
+     *  Does NOT consume — call [invalidateIssuedToken] only after the action actually succeeds. */
+    fun validateIssuedToken(token: String, action: String, body: JSONObject): Boolean {
+        val t = issuedTokens[token] ?: return false
         if (t.action != action || System.currentTimeMillis() > t.exp) return false
         val keys = t.params.keys()
         while (keys.hasNext()) {
@@ -127,6 +128,11 @@ class OverlayController(private val appCtx: Context) :
             if (body.optString(k) != t.params.optString(k)) return false
         }
         return true
+    }
+
+    /** Burn a token after a SUCCESSFUL action (enforces single-use without burning failed attempts). */
+    fun invalidateIssuedToken(token: String) {
+        issuedTokens.remove(token)
     }
 
     fun clearIssuedTokens() = issuedTokens.clear()
@@ -173,6 +179,14 @@ class OverlayController(private val appCtx: Context) :
             Pair(false, null)
         } finally {
             confirmPending.set(false)
+        }
+    }
+
+    /** Unpark a worker blocked in [confirmBlocking] with a denial — used on KILL / teardown so the
+     *  NanoHTTPD thread returns immediately and confirmPending is released (no ~90s stuck window). */
+    fun cancelPendingConfirm() {
+        if (confirmPending.compareAndSet(true, false)) {
+            confirmResult.offer(Pair(false, null))
         }
     }
 
@@ -233,6 +247,7 @@ class OverlayController(private val appCtx: Context) :
     }
 
     fun destroy() {
+        cancelPendingConfirm() // release any worker parked in confirmBlocking() before tearing down
         detach()
         clearIssuedTokens()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED

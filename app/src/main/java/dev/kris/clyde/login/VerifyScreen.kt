@@ -129,7 +129,7 @@ fun VerifyScreen(onContinue: () -> Unit) {
             Box(
                 Modifier.fillMaxWidth().border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp)).pressable(label = "Check again") { attempt++ }.padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Check again", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = ClydeColor.BlueDeep) }
+            ) { Text("Check again", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = ClydeColor.BlueText) }
             Spacer(Modifier.height(10.dp))
         } else {
             Text(

@@ -14,6 +14,7 @@ import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
+import dev.kris.clyde.ui.reduceMotion
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -28,12 +29,21 @@ enum class ClawdState(val asset: String, val blue: Boolean) {
 }
 
 @Composable
-fun ClawdView(state: ClawdState, modifier: Modifier = Modifier, size: Dp = 56.dp) {
+fun ClawdView(
+    state: ClawdState,
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp,
+    // null = decorative mascot (kept out of the TalkBack tree); the panel's text carries the meaning.
+    contentDescription: String? = null,
+) {
     val ctx = LocalContext.current
-    val loader = remember {
-        ImageLoader.Builder(ctx)
-            .components { add(ImageDecoderDecoder.Factory()) }
-            .build()
+    // Honor "remove animations": with the animated decoder omitted, Coil renders the GIF's first
+    // frame as a static bitmap — mascot still visible, no infinite loop.
+    val animate = !reduceMotion()
+    val loader = remember(animate) {
+        val b = ImageLoader.Builder(ctx)
+        if (animate) b.components { add(ImageDecoderDecoder.Factory()) }
+        b.build()
     }
     val filter = if (state.blue) ColorFilter.colorMatrix(hueRotation(177f)) else null
     AsyncImage(
@@ -42,7 +52,7 @@ fun ClawdView(state: ClawdState, modifier: Modifier = Modifier, size: Dp = 56.dp
             .crossfade(false)
             .build(),
         imageLoader = loader,
-        contentDescription = "Clawd",
+        contentDescription = contentDescription,
         colorFilter = filter,
         contentScale = ContentScale.Fit,
         modifier = modifier.size(size),

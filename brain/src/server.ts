@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
-import { config, assertSubscriptionAuth, assertServerSafe, apiKeyPresent } from "./config";
+import { config, assertSubscriptionAuth, assertServerSafe, apiKeyPresent, offSubscriptionReasons } from "./config";
 import { runAgent, haltActiveTurn } from "./agent";
 import type { AgentEvent } from "./types";
 
@@ -65,8 +65,18 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
   if (req.method === "GET" && url === "/auth/status") {
     const present = apiKeyPresent();
+    // subscription is true only if NOTHING (cred / route flag / base-url) bills off-subscription.
+    const offSub = offSubscriptionReasons();
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, subscription: !present, apiKeyPresent: present, plan: process.env.CLYDE_PLAN ?? null }));
+    res.end(
+      JSON.stringify({
+        ok: true,
+        subscription: offSub.length === 0,
+        apiKeyPresent: present,
+        offSubscription: offSub,
+        plan: process.env.CLYDE_PLAN ?? null,
+      })
+    );
     return;
   }
 

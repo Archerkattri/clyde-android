@@ -1,13 +1,15 @@
 package dev.kris.clyde.intents
 
-import android.app.SearchManager
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.telephony.SmsManager
+import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
 /** Tier-0: fire Android intents using the app's own permissions. Returns success. */
@@ -19,11 +21,27 @@ object DeviceIntents {
         "set_timer" -> setTimer(ctx, body.optInt("seconds"), body.optString("message"))
         "navigate_to" -> navigateTo(ctx, body.optString("destination"), body.optString("mode"))
         "open_url" -> openUrl(ctx, body.optString("url"))
-        "share_text" -> shareText(ctx, body.optString("text"), body.optString("targetPackage", null))
+        "share_text" -> shareText(ctx, body.optString("content"), body.optString("targetPackage", null))
         "start_call" -> startCall(ctx, body.optString("number"))
         "send_sms" -> sendSms(ctx, body.optString("to"), body.optString("body"))
         "add_calendar_event" -> addCalendarEvent(ctx, body)
         else -> false
+    }
+
+    /**
+     * The runtime permission an intent needs but doesn't have yet — null if none required or already
+     * granted. Checked BEFORE consuming the user's one-time token so a denied permission surfaces a
+     * clear error instead of silently failing and burning the approval.
+     */
+    fun missingPermissionFor(ctx: Context, name: String): String? {
+        val perm = when (name) {
+            "start_call" -> Manifest.permission.CALL_PHONE
+            "send_sms" -> Manifest.permission.SEND_SMS
+            "add_calendar_event" -> Manifest.permission.WRITE_CALENDAR
+            else -> return null
+        }
+        val granted = ContextCompat.checkSelfPermission(ctx, perm) == PackageManager.PERMISSION_GRANTED
+        return if (granted) null else perm.substringAfterLast('.')
     }
 
     private fun start(ctx: Context, intent: Intent): Boolean = try {

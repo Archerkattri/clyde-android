@@ -40,10 +40,17 @@ import dev.kris.clyde.R
 
 /** The Claude sunburst mark, worn in Clyde's blue (or any tint). */
 @Composable
-fun ClydeLogo(modifier: Modifier = Modifier, tint: Color = ClydeColor.Blue, size: Dp = 40.dp) {
+fun ClydeLogo(
+    modifier: Modifier = Modifier,
+    tint: Color = ClydeColor.Blue,
+    size: Dp = 40.dp,
+    // null = decorative (removed from the TalkBack tree). Pass null wherever a "Clyde" wordmark
+    // or "powered by Claude" label already conveys the meaning, to avoid double announcements.
+    contentDescription: String? = "Clyde",
+) {
     Icon(
         painter = painterResource(R.drawable.ic_clyde_logo),
-        contentDescription = "Clyde",
+        contentDescription = contentDescription,
         tint = tint,
         modifier = modifier.size(size),
     )
@@ -125,12 +132,12 @@ fun SecondaryLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         text = text,
         fontFamily = if (mono) Mono else Body,
         fontSize = if (mono) 11.sp else 13.sp,
-        color = if (mono) ClydeColor.Faint else ClydeColor.Muted,
+        color = ClydeColor.Muted, // Faint (2.41:1) fails AA — Muted passes even for the mono variant
         textAlign = TextAlign.Center,
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 8.dp),
+            .pressable(label = text) { onClick() } // >=48dp target + Role.Button + TalkBack label
+            .padding(vertical = 12.dp),
     )
 }
 

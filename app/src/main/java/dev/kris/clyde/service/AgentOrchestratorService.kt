@@ -57,7 +57,8 @@ class AgentOrchestratorService : Service() {
                 key = Prefs.clydeKey,
                 confirmHandler = { summary, details, action, params -> overlay.confirmBlocking(summary, details, action, params) },
                 overlayStatus = { text, _ -> overlay.status(text) },
-                consumeIntentToken = { token, action, body -> overlay.consumeIssuedToken(token, action, body) },
+                validateIntentToken = { token, action, body -> overlay.validateIssuedToken(token, action, body) },
+                invalidateIntentToken = { token -> overlay.invalidateIssuedToken(token) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -69,6 +70,7 @@ class AgentOrchestratorService : Service() {
         when (intent?.action) {
             ACTION_ASSIST -> beginAssist()
             ACTION_KILL -> {
+                overlay.cancelPendingConfirm() // unpark any blocked /confirm worker so later turns aren't auto-denied
                 overlay.clearIssuedTokens()
                 overlay.hide()
                 voice.stopListening()
@@ -144,6 +146,7 @@ class AgentOrchestratorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        overlay.cancelPendingConfirm() // release a parked confirm worker before closing the server
         server?.stop()
         voice.destroy()
         overlay.destroy()
