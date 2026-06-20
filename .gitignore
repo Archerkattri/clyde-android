@@ -23,6 +23,7 @@ local.properties
 .cxx/
 
 # --- IDE / OS ---
+.claude/
 .idea/
 .vscode/
 *.iml
