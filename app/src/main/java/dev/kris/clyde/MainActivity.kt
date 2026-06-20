@@ -3,19 +3,18 @@ package dev.kris.clyde
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.kris.clyde.home.HomeScreen
 import dev.kris.clyde.login.LoginScreen
 import dev.kris.clyde.login.VerifyScreen
+import dev.kris.clyde.setup.SetupScreen
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeTheme
 import dev.kris.clyde.util.Prefs
@@ -27,7 +26,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { Login, Verify, Home }
+private enum class Screen { Login, Verify, Setup, Home }
 
 @Composable
 private fun ClydeRoot() {
@@ -37,16 +36,10 @@ private fun ClydeRoot() {
             Screen.Login -> LoginScreen(onStartSignIn = { screen = Screen.Verify })
             Screen.Verify -> VerifyScreen(onContinue = {
                 Prefs.signedIn = true
-                screen = Screen.Home
+                screen = Screen.Setup
             })
-            Screen.Home -> HomePlaceholder()
+            Screen.Setup -> SetupScreen(onDone = { screen = Screen.Home })
+            Screen.Home -> HomeScreen(onAsk = { /* assist overlay wired in a later milestone */ })
         }
-    }
-}
-
-@Composable
-private fun HomePlaceholder() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Home — building next", color = ClydeColor.Muted)
     }
 }

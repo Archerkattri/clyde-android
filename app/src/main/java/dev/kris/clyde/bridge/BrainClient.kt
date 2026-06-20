@@ -44,6 +44,20 @@ object BrainClient {
         }
     }
 
+    /** Kill switch — invalidate outstanding confirm tokens on the brain. */
+    suspend fun kill(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val c = open("/kill", "POST")
+            c.doOutput = true
+            c.outputStream.use { it.write(ByteArray(0)) }
+            val ok = c.responseCode in 200..299
+            c.disconnect()
+            ok
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun open(path: String, method: String): HttpURLConnection {
         val c = URL(BASE + path).openConnection() as HttpURLConnection
         c.requestMethod = method
