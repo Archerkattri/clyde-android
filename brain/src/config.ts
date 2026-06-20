@@ -100,6 +100,9 @@ export const config = {
   rishCmd: process.env.RISH_CMD ?? "rish",
   suCmd: process.env.SU_CMD ?? "su",
   model: process.env.CLYDE_MODEL && process.env.CLYDE_MODEL.trim() !== "" ? process.env.CLYDE_MODEL : undefined,
+  // Explicit path to the JS claude-code CLI (cli.js). The embedded runtime sets this to the bundled
+  // copy; unset on a normal Termux install (SDK finds `claude` on PATH). The native CLI is glibc-only.
+  claudeCliPath: process.env.CLAUDE_CLI_PATH && process.env.CLAUDE_CLI_PATH.trim() !== "" ? process.env.CLAUDE_CLI_PATH : undefined,
   devNoAuth: process.env.CLYDE_DEV_NOAUTH === "1",
   allowNonLoopback: process.env.CLYDE_ALLOW_NONLOOPBACK === "1",
 } as const;
