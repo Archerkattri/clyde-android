@@ -86,7 +86,7 @@ export function assertSubscriptionAuth(): void {
   if (baseUrlOverridden()) {
     console.error(
       "\n[clyde] FATAL: ANTHROPIC_BASE_URL is set — refusing to redirect model traffic off the subscription endpoint.\n" +
-        "  Unset it, or (advanced opt-in, you accept the billing risk) set CLYDE_ALLOW_BASE_URL=1.\n"
+        "  Unset it, or set CLYDE_ALLOW_BASE_URL=1 to override (traffic will be billed per token).\n"
     );
     process.exit(1);
   }
@@ -123,8 +123,7 @@ export function assertServerSafe(): void {
     console.error(
       "\n[clyde] FATAL: CLYDE_KEY is not set — refusing to run an unauthenticated agent endpoint.\n" +
         "  Generate one and put it in brain/.env AND the Clyde app (Home → brain key):\n" +
-        "    node -e \"console.log('CLYDE_KEY='+require('crypto').randomBytes(16).toString('hex'))\"\n" +
-        "  (Dev-only escape hatch: CLYDE_DEV_NOAUTH=1.)\n"
+        "    node -e \"console.log('CLYDE_KEY='+require('crypto').randomBytes(16).toString('hex'))\"\n"
     );
     process.exit(1);
   }

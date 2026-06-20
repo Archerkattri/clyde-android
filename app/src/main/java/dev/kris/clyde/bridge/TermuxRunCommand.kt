@@ -8,7 +8,7 @@ import android.os.Build
 import android.util.Log
 
 /** Fires Termux's RUN_COMMAND intent. Requires com.termux.permission.RUN_COMMAND and
- *  Termux `allow-external-apps=true`. Used to launch `claude login` and (Model B) oneshot. */
+ *  Termux `allow-external-apps=true`. Used to launch `claude login` and the one-shot brain query. */
 object TermuxRunCommand {
     private const val TERMUX = "com.termux"
     private const val RUN_SERVICE = "com.termux.app.RunCommandService"
@@ -48,7 +48,7 @@ object TermuxRunCommand {
             else ctx.startService(intent)
             true
         } catch (e: Exception) {
-            Log.w("Clyde", "Termux RUN_COMMAND failed (is Termux installed + allow-external-apps?)", e)
+            Log.w("Clyde", "Termux RUN_COMMAND failed; ensure Termux is installed and allow-external-apps is enabled", e)
             false
         }
     }

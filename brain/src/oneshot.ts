@@ -1,5 +1,5 @@
-// Model B — one-shot CLI entry. `tsx src/oneshot.ts "<query>"` runs one turn and prints
-// the final answer to stdout. Used by the app's TermuxRunCommand fallback (Phase 1).
+// One-shot CLI entry: `tsx src/oneshot.ts "<query>"` runs a single agent turn and prints the
+// final answer to stdout. Used as the non-streaming fallback when launched via Termux.
 import { assertSubscriptionAuth } from "./config";
 import { runAgent } from "./agent";
 import type { AgentEvent } from "./types";

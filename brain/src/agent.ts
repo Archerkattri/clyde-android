@@ -114,7 +114,8 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
       }
     }
   } catch (e) {
-    emit({ type: "error", text: `agent error: ${String(e)}` });
+    console.error("[clyde] agent error:", e); // detail to logs only
+    emit({ type: "error", text: "Something went wrong while handling that." });
     return;
   } finally {
     activeQuery = null;

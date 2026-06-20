@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
@@ -15,6 +16,7 @@ import coil3.compose.AsyncImage
 import coil3.gif.AnimatedImageDecoder
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import dev.kris.clyde.R
 import dev.kris.clyde.ui.reduceMotion
 import kotlin.math.cos
 import kotlin.math.sin
@@ -56,6 +58,9 @@ fun ClawdView(
         contentDescription = contentDescription,
         colorFilter = filter,
         contentScale = ContentScale.Fit,
+        // release builds don't ship the (AGPL) GIFs — fall back to the Clyde mark, never a blank
+        error = painterResource(R.drawable.ic_clyde_logo),
+        fallback = painterResource(R.drawable.ic_clyde_logo),
         modifier = modifier.size(size),
     )
 }

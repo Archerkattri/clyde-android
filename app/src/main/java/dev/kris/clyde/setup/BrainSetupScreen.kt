@@ -180,7 +180,7 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
         PrimaryButton("Continue", onClick = onConnected, enabled = online == true)
-        SecondaryLink("Skip for now — set this up later", onClick = onSkip)
+        SecondaryLink("Set this up later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -280,7 +280,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         PrimaryButton("Continue", onClick = onConnected, enabled = online == true && signedIn)
-        SecondaryLink("Skip for now — finish later", onClick = onSkip)
+        SecondaryLink("Finish setup later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))
     }
 }

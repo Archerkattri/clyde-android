@@ -123,7 +123,8 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     try {
       await runAgent({ text, sessionId }, emit);
     } catch (e) {
-      emit({ type: "error", text: String(e) });
+      console.error("[clyde] query error:", e);
+      emit({ type: "error", text: "Something went wrong while handling that." });
     } finally {
       inFlight--;
       res.end();
@@ -136,5 +137,5 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 });
 
 server.listen(config.brainPort, config.brainHost, () => {
-  console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: subscription)`);
+  console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: ${config.devNoAuth ? "DISABLED (dev)" : "shared-key"})`);
 });

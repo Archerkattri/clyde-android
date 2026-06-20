@@ -100,7 +100,7 @@ class AgentOrchestratorService : Service() {
         voice.listen(
             onPartial = { overlay.transcript(it) },
             onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
-            onError = { overlay.status("Didn't catch that"); Log.w(TAG, "STT: $it") },
+            onError = { overlay.status("Didn't catch that"); Log.w(TAG, "Speech recognition error: $it") },
         )
     }
 
@@ -112,7 +112,11 @@ class AgentOrchestratorService : Service() {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
                     "final" -> ev.optString("text").let { overlay.answer(it); voice.speak(it) }
-                    "error" -> ev.optString("text").let { overlay.answer("Sorry — $it"); voice.speak("Sorry, $it") }
+                    "error" -> {
+                        Log.w(TAG, "brain error: ${ev.optString("text")}")
+                        val msg = "Sorry, something went wrong — try again."
+                        overlay.answer(msg); voice.speak(msg)
+                    }
                     else -> {}
                 }
             }

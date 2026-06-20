@@ -254,7 +254,7 @@ class OverlayController(private val appCtx: Context) :
             view = cv
             lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         } catch (e: Exception) {
-            Log.e("Clyde", "overlay addView failed (SYSTEM_ALERT_WINDOW granted?)", e)
+            Log.e("Clyde", "overlay addView failed; SYSTEM_ALERT_WINDOW may not be granted", e)
         }
     }
 
