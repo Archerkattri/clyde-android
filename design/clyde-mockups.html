@@ -452,8 +452,8 @@
 <div class="flowstrip">
   <span class="fs-t">first run</span>
   <span class="fs-s on">1 · Sign in with your Claude plan</span><span class="fs-arr">→</span>
-  <span class="fs-s on">2 · Clyde checks your phone</span><span class="fs-arr">→</span>
-  <span class="fs-s">3 · Choose how much it can do</span><span class="fs-arr">→</span>
+  <span class="fs-s on">2 · Set up Clyde's brain (in-app)</span><span class="fs-arr">→</span>
+  <span class="fs-s">3 · Grant access</span><span class="fs-arr">→</span>
   <span class="fs-s">done</span>
 </div>
 
@@ -472,12 +472,11 @@
         <div class="lead" style="text-align:center;margin-bottom:4px">Clyde runs on <b style="color:var(--ink);font-weight:600">your Claude subscription</b> — the same Pro or Max plan you already pay for. No API key, no per-message billing.</div>
         <div class="poweredby" style="justify-content:center;margin:12px 0 16px"><svg class="spark logo" width="13" height="13" style="color:var(--claude)"><use href="#clyde-mark"/></svg> powered by Claude · never an API key</div>
 
-        <div class="btn primary">Open Termux &amp; start sign-in</div>
-        <div class="lead" style="text-align:center;font-size:12.5px;margin-top:10px">Termux opens and runs <span class="mono" style="font-family:var(--mono);color:var(--ink)">claude login</span>. Finish in your browser — Clyde never sees your password or token.</div>
+        <div class="btn primary">Get started</div>
+        <div class="lead" style="text-align:center;font-size:12.5px;margin-top:10px">Next: a one-time setup gets Clyde's brain running in the app. Clyde never sees your password or token.</div>
 
         <div style="flex:1"></div>
-        <a class="seclink">Signing in on the phone is awkward? Copy ~/.claude from desktop</a>
-        <a class="seclink adv">Advanced: use an API key (not recommended) ›</a>
+        <div class="lead" style="text-align:center;font-size:12px;color:var(--muted)">Signing in on the phone is awkward? You can copy <span class="mono" style="font-family:var(--mono)">~/.claude</span> from a desktop where you've already run claude login.</div>
       </div>
     </div></div>
   </div>
@@ -512,29 +511,21 @@
 
   <!-- ============ 03. SETUP — AUTO-DETECT (ROOT / CUSTOM ROM PATH) ============ -->
   <div>
-    <div class="caption"><b>03</b> · setup · auto-detected · one-button on root/custom ROM</div>
+    <div class="caption"><b>03</b> · setup · clyde's brain runs in-app (embedded runtime)</div>
     <div class="phone"><div class="screen">
       <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
       <div class="body">
-        <div class="eyebrow">setup · 1 of 1 on this phone</div>
-        <div class="h1">Clyde can set itself up</div>
+        <div class="eyebrow">setup · clyde's brain</div>
+        <div class="h1">Setting up Clyde's brain</div>
+        <div class="lead" style="margin:8px 0 16px">Clyde's brain runs <b style="color:var(--ink);font-weight:600">inside the app</b> — nothing else to install, no Termux, no F-Droid. Sign in once with your Claude plan and you're set.</div>
 
-        <div class="detected" style="margin:10px 0 14px">
-          <div class="ic">su</div>
-          <div><div class="dt">Root access found · LineageOS</div><div class="dd">probed: su -c id → uid=0 · getprop ro.lineage.version</div></div>
-        </div>
-        <div class="lead" style="margin-bottom:6px">Because this phone is rooted, Clyde grants every permission itself — <b style="color:var(--ink);font-weight:600">no taps, no pairing codes</b>. Watch it work:</div>
-
-        <div class="card" style="padding:6px 14px;margin:10px 0">
-          <div class="autostep done"><span class="pip">✓</span><span class="at">Grant screen-reading &amp; tap access</span><span class="ac">pm grant</span></div>
-          <div class="autostep done"><span class="pip">✓</span><span class="at">Turn on accessibility service</span><span class="ac">settings put secure</span></div>
-          <div class="autostep run"><span class="pip"></span><span class="at">Stop Android killing the brain</span><span class="ac">phantom procs off</span></div>
-          <div class="autostep wait"><span class="pip">4</span><span class="at">Keep awake &amp; auto-start on boot</span><span class="ac">Termux:Boot</span></div>
-        </div>
+        <div class="check ok"><span class="box"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#fff" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></span><span class="ct">Runtime ready</span><span class="cm">unpacked</span></div>
+        <div class="check pend"><span class="box"></span><span class="ct">Sign in to Claude</span><span class="cm">opens your browser</span></div>
+        <div class="check pend"><span class="box"></span><span class="ct">Brain online</span><span class="cm">starting…</span></div>
 
         <div style="flex:1"></div>
-        <div class="btn primary">Configure automatically</div>
-        <a class="seclink">Set it up manually instead</a>
+        <div class="btn primary">Sign in to Claude</div>
+        <a class="seclink">Skip for now — finish later</a>
       </div>
     </div></div>
   </div>
@@ -557,7 +548,7 @@
         <div class="choice featured">
           <div class="ttl">Full control <span class="tag">recommended</span></div>
           <div class="ds">Adds real typing, installing apps, and changing settings.</div>
-          <div class="why"><span class="b"></span>Clyde does the ADB setup; you read it <b style="color:var(--ink);font-weight:600">one 6-digit code</b>.</div>
+          <div class="why"><span class="b"></span>You pair once in <b style="color:var(--ink);font-weight:600">Android's wireless-debugging dialog</b>.</div>
         </div>
 
         <div style="flex:1"></div>
@@ -573,29 +564,26 @@
     <div class="phone"><div class="screen">
       <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
       <div class="body">
-        <div class="eyebrow">full control · 1 human step, then automatic</div>
-        <div class="h1">Read Clyde the pairing code</div>
-        <div class="lead" style="margin-bottom:12px">Android shows this code only in its own secure dialog, so it's the single thing Clyde can't do for you. Type it once.</div>
+        <div class="eyebrow">full control · pair in Android's dialog</div>
+        <div class="h1">Pair with wireless debugging</div>
+        <div class="lead" style="margin-bottom:14px">You enter the code in <b style="color:var(--ink);font-weight:600">Android's own secure dialog</b> — Clyde can't see it. Pair there, then come back.</div>
 
-        <div class="codeentry">
-          <i>4</i><i>2</i><i>7</i><i class="cur empty">_</i><i class="empty">_</i><i class="empty">_</i>
+        <div class="card" style="padding:12px 14px;margin-bottom:14px">
+          <div class="eyebrow" style="margin-bottom:6px">where to find it</div>
+          <div style="font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink)">Settings → Developer options → Wireless debugging → Pair device with code</div>
         </div>
-        <div class="lead" style="text-align:center;font-size:12px;color:var(--faint);margin-bottom:14px">from Settings → Developer options → Wireless debugging → Pair with code</div>
 
-        <div class="eyebrow" style="margin-bottom:2px">you do this</div>
+        <div class="eyebrow" style="margin-bottom:2px">the steps</div>
         <div class="card" style="padding:6px 14px;margin-bottom:12px">
           <div class="autostep done"><span class="pip">✓</span><span class="at">Turn on Developer options</span><span class="ac">tap Build no. ×7</span></div>
-          <div class="autostep done"><span class="pip">✓</span><span class="at">Turn on Wireless debugging</span><span class="ac">deep-linked</span></div>
-          <div class="autostep run"><span class="pip"></span><span class="at">Read the 6-digit code into Clyde</span><span class="ac">↑ above</span></div>
+          <div class="autostep done"><span class="pip">✓</span><span class="at">Open Wireless debugging</span><span class="ac">deep-linked</span></div>
+          <div class="autostep run"><span class="pip"></span><span class="at">Pair with a code in Android's dialog</span><span class="ac">you do this</span></div>
         </div>
-        <div class="eyebrow" style="margin-bottom:2px">Clyde does the rest</div>
-        <div class="card" style="padding:6px 14px">
-          <div class="autostep wait"><span class="pip">·</span><span class="at">Find the ports, pair &amp; connect</span><span class="ac">adb mdns</span></div>
-          <div class="autostep wait"><span class="pip">·</span><span class="at">Start Shizuku, copy rish into Termux</span><span class="ac">start.sh</span></div>
-          <div class="autostep wait"><span class="pip">·</span><span class="at">Keep alive &amp; re-arm after reboot</span><span class="ac">Boot autostart</span></div>
-        </div>
+
         <div style="flex:1"></div>
-        <div class="lead" style="font-size:11.5px;color:var(--faint);margin-top:10px">Heads up: wireless debugging resets on reboot. On Android 13+ Shizuku re-arms itself on trusted Wi-Fi; otherwise you'll re-read a code.</div>
+        <div class="lead" style="font-size:11.5px;color:var(--faint);margin-top:10px">After pairing, Clyde re-checks for Shizuku and turns on the extra powers. Wireless debugging resets on reboot; on Android 13+ Shizuku can re-arm on trusted Wi-Fi.</div>
+        <div class="btn primary" style="margin-top:10px">Open wireless debugging</div>
+        <a class="seclink">I've paired — continue</a>
       </div>
     </div></div>
   </div>
