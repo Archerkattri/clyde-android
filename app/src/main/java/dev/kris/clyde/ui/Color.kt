@@ -38,6 +38,10 @@ object ClydeColor {
     val OnTerracotta = Color(0xFFFFFFFF)
     val Danger = Color(0xFFC0492F)
     val Success = Color(0xFF3FA6A0)
+
+    // Anthropic accent green — scoped to "verified / done" affordances only.
+    val Verda = Color(0xFF788C5D)
+    val VerdaDeep = Color(0xFF5C6E45)
 }
 
 /** Tier accent color by index 0..3. */

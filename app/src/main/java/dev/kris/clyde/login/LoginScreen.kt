@@ -1,0 +1,88 @@
+package dev.kris.clyde.login
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Text
+import dev.kris.clyde.bridge.TermuxRunCommand
+import dev.kris.clyde.ui.Body
+import dev.kris.clyde.ui.ClydeColor
+import dev.kris.clyde.ui.ClydeLogo
+import dev.kris.clyde.ui.Display
+import dev.kris.clyde.ui.HeroMark
+import dev.kris.clyde.ui.Mono
+import dev.kris.clyde.ui.PrimaryButton
+import dev.kris.clyde.ui.SecondaryLink
+
+/** Panel 01 — Sign in with your Claude plan. Launches `claude login` in Termux. */
+@Composable
+fun LoginScreen(onStartSignIn: () -> Unit) {
+    val ctx = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ClydeColor.Paper)
+            .padding(horizontal = 22.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(20.dp))
+        HeroMark()
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "Sign in with your\nClaude plan",
+            fontFamily = Display,
+            fontWeight = FontWeight.Bold,
+            fontSize = 26.sp,
+            lineHeight = 30.sp,
+            letterSpacing = (-0.025).em,
+            color = ClydeColor.Ink,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Clyde runs on your Claude subscription — the same Pro or Max plan you already pay for. No API key, no per-message billing.",
+            fontFamily = Body,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+            color = ClydeColor.Muted,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            ClydeLogo(tint = ClydeColor.Terracotta, size = 13.dp)
+            Text("powered by Claude · never an API key", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+        }
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton("Open Termux & start sign-in", onClick = {
+            TermuxRunCommand.startClaudeLogin(ctx)
+            onStartSignIn()
+        })
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Termux opens and runs claude login. Finish in your browser — Clyde never sees your password or token.",
+            fontFamily = Body,
+            fontSize = 12.5f.sp,
+            lineHeight = 18.sp,
+            color = ClydeColor.Muted,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.weight(1f))
+        SecondaryLink("Signing in on the phone is awkward? Copy ~/.claude from desktop", onClick = {})
+        SecondaryLink("Advanced: use an API key (not recommended)", onClick = {}, mono = true)
+    }
+}

@@ -34,6 +34,15 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
+  // Auth snapshot for the app's login/verify screen. The brain refuses to boot with an
+  // API key set, so apiKeyPresent is false at runtime; subscription is implied by booting.
+  if (req.method === "GET" && url === "/auth/status") {
+    const apiKeyPresent = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== "");
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, subscription: !apiKeyPresent, apiKeyPresent, plan: process.env.CLYDE_PLAN ?? null }));
+    return;
+  }
+
   if (req.method === "POST" && url === "/query") {
     const raw = await readBody(req);
     let parsed: { text?: unknown; sessionId?: unknown };
