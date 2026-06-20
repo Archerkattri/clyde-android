@@ -101,7 +101,7 @@ fun HomeScreen(onAsk: () -> Unit) {
         Spacer(Modifier.height(20.dp))
         Eyebrow("what clyde can do")
         Spacer(Modifier.height(6.dp))
-        CapabilityRow("Apps, alarms, texts, navigation", "always on", live = true, on = true)
+        CapabilityRow("Apps, alarms, timers, navigation", "built-in", live = true, on = true)
         CapabilityRow("See & tap the screen", if (accessibilityOn) "on" else "tap to enable", live = accessibilityOn, on = accessibilityOn)
         CapabilityRow("Type, install, change settings", if (shizukuOn) "on" else "off", live = shizukuOn, on = shizukuOn)
         CapabilityRow("Unrestricted (root)", if (rootOn) "on" else "off", live = rootOn, on = rootOn)

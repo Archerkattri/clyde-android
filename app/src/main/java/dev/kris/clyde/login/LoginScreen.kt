@@ -33,7 +33,6 @@ import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.HeroMark
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
-import dev.kris.clyde.ui.SecondaryLink
 
 /** Panel 01 — Sign in with your Claude plan. Launches `claude login` in Termux. */
 @Composable
@@ -109,7 +108,13 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
             )
         }
         Spacer(Modifier.weight(1f))
-        SecondaryLink("Signing in on the phone is awkward? Copy ~/.claude from desktop", onClick = {})
-        SecondaryLink("Advanced: use an API key (not recommended)", onClick = {}, mono = true)
+        Text(
+            "Signing in on the phone is awkward? You can copy ~/.claude from a desktop where you've already run claude login.",
+            fontFamily = Body,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = ClydeColor.Muted,
+            textAlign = TextAlign.Center,
+        )
     }
 }

@@ -182,9 +182,9 @@ private fun GrantRow(title: String, desc: String, done: Boolean, onGrant: () -> 
 
 @Composable
 private fun ColumnScope.AutoConfigView(romName: String, rooted: Boolean, onConfigure: () -> Unit, onManual: () -> Unit) {
-    Eyebrow("setup · 1 of 1 on this phone")
+    Eyebrow("setup · this phone is unlocked")
     Spacer(Modifier.height(6.dp))
-    H1("Clyde can set itself up")
+    H1("Quick setup on this phone")
     Spacer(Modifier.height(12.dp))
     Row(
         modifier = Modifier
@@ -202,16 +202,16 @@ private fun ColumnScope.AutoConfigView(romName: String, rooted: Boolean, onConfi
         Spacer(Modifier.size(11.dp))
         Column {
             Text(if (rooted) "Root access found · $romName" else "Custom ROM · $romName", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.5f.sp, color = ClydeColor.Ink)
-            Text(if (rooted) "probed: su -c id → uid=0" else "probed: getprop ro.* fingerprints", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+            Text(if (rooted) "found an su binary on this device" else "matched custom-ROM build props", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
         }
     }
     Spacer(Modifier.height(12.dp))
     Text(
-        "Because this phone is unlocked, Clyde grants the permissions itself — no taps, no pairing codes.",
+        "No ADB pairing needed on this phone. You'll grant a few permissions on the next screen — Android asks for each one as you tap Grant.",
         fontFamily = Body, fontSize = 14.sp, lineHeight = 21.sp, color = ClydeColor.Muted,
     )
     Spacer(Modifier.weight(1f))
-    PrimaryButton("Configure automatically", onClick = onConfigure)
+    PrimaryButton("Continue to permissions", onClick = onConfigure)
     SecondaryLink("Set it up manually instead", onClick = onManual)
 }
 
@@ -239,7 +239,7 @@ private fun ColumnScope.ChooserView(onBasic: () -> Unit, onFull: () -> Unit) {
         title = "Full control",
         tag = "recommended",
         desc = "Adds real typing, installing apps, and changing settings.",
-        why = "Clyde does the ADB setup; you read it one 6-digit code.",
+        why = "You pair once in Android's wireless-debugging dialog.",
         featured = true,
         onClick = onFull,
     )
@@ -247,28 +247,30 @@ private fun ColumnScope.ChooserView(onBasic: () -> Unit, onFull: () -> Unit) {
 
 @Composable
 private fun ColumnScope.PairingView(onOpenWirelessDebugging: () -> Unit, onDone: () -> Unit) {
-    Eyebrow("full control · 1 human step, then automatic")
+    Eyebrow("full control · pair in Android's dialog")
     Spacer(Modifier.height(6.dp))
-    H1("Read Clyde the pairing code")
+    H1("Pair with wireless debugging")
     Spacer(Modifier.height(8.dp))
     Text(
-        "Android shows this code only in its own secure dialog, so it's the single thing Clyde can't do for you. Open wireless debugging, tap \"Pair device with code\", and read it in.",
+        "You enter the code in Android's own secure dialog — Clyde can't see it. Open wireless debugging, tap \"Pair device with code\", type the code there, then come back.",
         fontFamily = Body, fontSize = 14.sp, lineHeight = 21.sp, color = ClydeColor.Muted,
     )
     Spacer(Modifier.height(16.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-        repeat(6) { i ->
-            Box(
-                Modifier.weight(1f).height(48.dp)
-                    .background(ClydeColor.Paper, RoundedCornerShape(9.dp))
-                    .border(if (i == 0) 2.dp else 1.dp, if (i == 0) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(9.dp)),
-                contentAlignment = Alignment.Center,
-            ) { Text("_", fontFamily = Mono, fontSize = 20.sp, color = ClydeColor.Faint) }
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+            .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+            .padding(13.dp),
+    ) {
+        Text("where to find it", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted)
+        Spacer(Modifier.height(4.dp))
+        Text("Settings → Developer options → Wireless debugging → Pair device with code", fontFamily = Mono, fontSize = 11.5f.sp, lineHeight = 17.sp, color = ClydeColor.Ink)
     }
     Spacer(Modifier.weight(1f))
     PrimaryButton("Open wireless debugging", onClick = onOpenWirelessDebugging)
-    SecondaryLink("Paired — finish setup", onClick = onDone)
+    // Honest: this only advances; the next screen re-probes the REAL Shizuku/ADB capability.
+    SecondaryLink("I've paired — continue", onClick = onDone)
 }
 
 @Composable

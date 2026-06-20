@@ -101,7 +101,7 @@ fun VerifyScreen(onContinue: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
 
-        // Termux preview strip
+        // Terminal-styled LIVE status — reflects the real brain/auth handshake, never a canned login.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -110,9 +110,12 @@ fun VerifyScreen(onContinue: () -> Unit) {
                 .padding(13.dp),
         ) {
             TermuxLine("~ $ ", "claude login", Color(0xFF56E6C0))
-            Text("→ opening browser to claude.ai…", fontFamily = Mono, fontSize = 11.sp, color = Color(0xFF5C7068))
-            TermuxLine("✓ ", "Logged in", Color(0xFF56E6C0))
-            TermuxLine("~ $ ", "claude /status", Color(0xFF56E6C0))
+            val (glyph, msg, col) = when {
+                verified -> Triple("✓ ", "signed in · ${auth?.plan ?: "subscription"}", Color(0xFF56E6C0))
+                reachable == true -> Triple("… ", "waiting for claude login to finish", Color(0xFF5C7068))
+                else -> Triple("… ", "connecting to the brain on 127.0.0.1:8765", Color(0xFF5C7068))
+            }
+            TermuxLine(glyph, msg, col)
         }
         Spacer(Modifier.height(16.dp))
 
