@@ -19,10 +19,12 @@ loadDotEnv();
 // Credentials the bundled Agent SDK honors that would switch the brain off the subscription
 // onto pay-per-token billing. The SDK (claude-agent-sdk) reads ALL of these from process.env
 // and inherits them into its CLI subprocess, so any one of them defeats the subscription rule.
+// NOTE: CLAUDE_CODE_OAUTH_TOKEN is deliberately NOT here — it's the SUBSCRIPTION's own headless
+// token (from `claude setup-token`), the supported way to run the subscription without an
+// interactive login. These are the real off-subscription overrides (API key / enterprise / proxy).
 const OVERRIDE_CREDS = [
   "ANTHROPIC_API_KEY",
   "ANTHROPIC_AUTH_TOKEN",
-  "CLAUDE_CODE_OAUTH_TOKEN",
   "ANTHROPIC_IDENTITY_TOKEN",
   "ANTHROPIC_IDENTITY_TOKEN_FILE",
   "ANTHROPIC_SERVICE_ACCOUNT_ID",

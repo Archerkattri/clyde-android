@@ -83,7 +83,7 @@ check("clean env → on subscription", offSubscriptionReasons().length === 0);
 clearOff(); process.env.ANTHROPIC_API_KEY = "sk-xxx";
 check("API key → off subscription", offSubscriptionReasons().includes("ANTHROPIC_API_KEY"));
 clearOff(); process.env.CLAUDE_CODE_OAUTH_TOKEN = "tok";
-check("OAuth token → off subscription", offSubscriptionReasons().includes("CLAUDE_CODE_OAUTH_TOKEN"));
+check("CLAUDE_CODE_OAUTH_TOKEN is the SUBSCRIPTION token — NOT off-subscription", offSubscriptionReasons().length === 0);
 clearOff(); process.env.ANTHROPIC_SERVICE_ACCOUNT_ID = "svc";
 check("service account → off subscription", offSubscriptionReasons().includes("ANTHROPIC_SERVICE_ACCOUNT_ID"));
 clearOff(); process.env.CLAUDE_CODE_USE_BEDROCK = "1";
