@@ -63,6 +63,13 @@
      are derived shades. The Compose port keeps the same node names and
      drives them off an ActionState enum (see board legend, panel 07). */
   .clawd{display:block;flex:none;aspect-ratio:1/1;image-rendering:pixelated;object-fit:contain}
+  /* shiny blue Clawd for LIVE states; orange stays for warn/consequence */
+  .clawd.cw-blue{filter:hue-rotate(177deg) saturate(1.4) brightness(1.06) drop-shadow(0 4px 5px rgba(40,28,20,.22))}
+  .clawd.cw-warn{filter:drop-shadow(0 4px 6px rgba(40,28,20,.24))}
+  /* perched: the character sits ON the top edge of its box, peeking out — never contained */
+  .clawd.perch{position:absolute;left:50%;transform:translateX(-50%);top:-36px;z-index:5}
+  .clawd.perch-sm{position:absolute;left:50%;transform:translateX(-50%);top:-26px;z-index:5}
+  .clawd.fab-free{position:absolute;right:6px;bottom:8px;z-index:5}
   /* REST skin — clay. The crab is "asleep/idle": warm, low-contrast. */
   .clawd.rest{color:#C9B6A2; --cw-mid:#B79E86; --cw-dark:#7C6A58;}
   /* LIVE skin — Clyde blue. "blue = alive" gets a CHARACTER to carry it. */
@@ -283,7 +290,7 @@
      0 here + dimAmount .42; the sheet itself is Surface(paper), elevation 8. */
   .sheetview{position:absolute;inset:0;z-index:3;background:rgba(30,22,16,.42);display:flex;align-items:flex-end;
     backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
-  .sheet{width:100%;background:var(--paper);border-top:2px solid var(--claude);border-radius:24px 24px 0 0;padding:18px 18px 22px;
+  .sheet{width:100%;background:var(--paper);border-top:2px solid var(--claude);border-radius:24px 24px 0 0;position:relative;padding:18px 18px 22px;
     box-shadow:0 -28px 60px -20px rgba(40,28,20,.5)}
   .grip{width:38px;height:4px;border-radius:3px;background:var(--line-2);margin:0 auto 16px}
   .recipient{display:flex;align-items:center;gap:12px}
@@ -604,8 +611,8 @@
       <div class="statusbar onapp" style="z-index:3"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
       <div class="scrim"></div>
       <div class="summon">
+        <img class="clawd cw-blue perch" src="assets/clawd/gif/clawd-idle.gif" width="60" height="60">
         <div class="sum-head">
-          <img class="clawd" src="assets/clawd/gif/clawd-idle.gif" width="30" height="30">
           <span class="sum-name">Clyde</span>
           <span class="sum-by"><svg class="spark" width="12" height="12"><use href="#clyde-mark"/></svg>Claude</span>
           <span class="sum-x">⌄</span>
@@ -629,8 +636,8 @@
       <div class="sheetview">
         <div class="sheet">
           <div class="grip"></div>
+          <img class="clawd cw-warn perch" src="assets/clawd/gif/clawd-error.gif" width="54" height="54">
           <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
-            <img class="clawd" src="assets/clawd/gif/clawd-error.gif" width="28" height="28">
             <span class="eyebrow" style="color:var(--claude-deep)">clyde wants to send a text · leaves your phone</span>
           </div>
           <div class="recipient">
@@ -658,7 +665,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div class="brand"><svg class="logo" width="28" height="28"><use href="#clyde-mark"/></svg><div class="wordmark" style="font-size:27px">Clyde<span class="dot">.</span></div></div>
           <!-- the resting character: clay crab = "idle, here, asleep until summoned" -->
-          <img class="clawd" src="assets/clawd/gif/clawd-idle.gif" width="34" height="34">
+          <img class="clawd cw-blue" src="assets/clawd/gif/clawd-idle.gif" width="46" height="46">
         </div>
         <!-- liveness shown by the telemetry line, not an "online" pill -->
         <div class="telemetry" style="margin-top:8px">brain · 127.0.0.1:8765 · <span class="live">240ms</span></div>
@@ -695,10 +702,11 @@
       <div class="appbg"><div class="clock">9:41</div><div class="date">Saturday, June 20</div><div class="appgrid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
       <div class="statusbar onapp"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
       <div class="statuschip">
-        <div class="row1"><img class="clawd" src="assets/clawd/gif/clawd-building.gif" width="26" height="26"><span class="doing">Following @nasa for you</span><span class="abort">Stop</span></div>
+        <img class="clawd cw-blue perch-sm" src="assets/clawd/gif/clawd-building.gif" width="46" height="46">
+        <div class="row1"><span class="doing">Following @nasa for you</span><span class="abort">Stop</span></div>
         <div class="sub">tapping Follow · Instagram</div>
       </div>
-      <div class="fab acting"><img class="clawd" src="assets/clawd/gif/clawd-mini-crabwalk.gif" width="40" height="40"></div>
+      <img class="clawd cw-blue fab-free" src="assets/clawd/gif/clawd-idle.gif" width="78" height="78">
     </div></div>
   </div>
 
@@ -710,8 +718,8 @@
       <div class="statusbar onapp"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
       <div class="scrim"></div>
       <div class="summon">
+        <img class="clawd cw-blue perch" src="assets/clawd/gif/clawd-happy.gif" width="56" height="56">
         <div class="sum-head">
-          <img class="clawd" src="assets/clawd/gif/clawd-happy.gif" width="30" height="30">
           <span class="sum-name">Clyde</span>
           <span class="sum-by"><svg class="spark" width="12" height="12"><use href="#clyde-mark"/></svg>Claude</span>
           <span class="sum-x">⌄</span>
@@ -736,15 +744,15 @@
   <div>
     <div class="caption"><b>11</b> · Clawd · one node tree, an enum drives it</div>
     <div class="spec">
-      <h3><img class="clawd" src="assets/clawd/gif/clawd-idle.gif" width="22" height="22"> ActionState → animation</h3>
+      <h3><img class="clawd cw-blue" src="assets/clawd/gif/clawd-idle.gif" width="24" height="24"> ActionState → animation</h3>
       <div class="sub">One <b>Clawd</b> composable. Skin = state class (rest clay · live blue · warn terracotta). The same node names (<b>cwBody, cwClawL/R, cwStalkL/R, cwPupL/R, cwEye</b>) animate in HTML and in Compose — author the Lottie on the same 24-grid. Loops run forever; one-shots play once then fall back to <b>idle</b>.</div>
       <div class="states">
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-idle.gif" width="28" height="28"><span class="nm">idle</span><span class="ds">clay · breathing bob + slow blink. The resting home avatar.</span><span class="lp">loop</span></div>
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-mini-peek.gif" width="28" height="28"><span class="nm">listening</span><span class="ds">blue · eye-stalks perk, eyes widen, lean-in. Mic open.</span><span class="lp">loop</span></div>
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-building.gif" width="28" height="28"><span class="nm">working</span><span class="ds">blue · claws tap/type, body sways. Tool running.</span><span class="lp">loop</span></div>
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-mini-crabwalk.gif" width="28" height="28"><span class="nm">navigating</span><span class="ds">blue · sidestep scuttle. The minimized-FAB state.</span><span class="lp">loop</span></div>
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-happy.gif" width="28" height="28"><span class="nm">success</span><span class="ds">blue · both claws up + hop. Plays once → idle.</span><span class="lp once">once</span></div>
-        <div class="strow"><img class="clawd" src="assets/clawd/gif/clawd-error.gif" width="28" height="28"><span class="nm">consequence</span><span class="ds">terracotta · claws spread, slow pulse. The irreversible-send / error cue.</span><span class="lp once">once</span></div>
+        <div class="strow"><img class="clawd cw-warn" src="assets/clawd/gif/clawd-idle.gif" width="32" height="32"><span class="nm">idle</span><span class="ds">clay · breathing bob + slow blink. The resting home avatar.</span><span class="lp">loop</span></div>
+        <div class="strow"><img class="clawd cw-blue" src="assets/clawd/gif/clawd-mini-peek.gif" width="32" height="32"><span class="nm">listening</span><span class="ds">blue · eye-stalks perk, eyes widen, lean-in. Mic open.</span><span class="lp">loop</span></div>
+        <div class="strow"><img class="clawd cw-blue" src="assets/clawd/gif/clawd-building.gif" width="32" height="32"><span class="nm">working</span><span class="ds">blue · claws tap/type, body sways. Tool running.</span><span class="lp">loop</span></div>
+        <div class="strow"><img class="clawd cw-blue" src="assets/clawd/gif/clawd-mini-crabwalk.gif" width="32" height="32"><span class="nm">navigating</span><span class="ds">blue · sidestep scuttle. The minimized-FAB state.</span><span class="lp">loop</span></div>
+        <div class="strow"><img class="clawd cw-blue" src="assets/clawd/gif/clawd-happy.gif" width="32" height="32"><span class="nm">success</span><span class="ds">blue · both claws up + hop. Plays once → idle.</span><span class="lp once">once</span></div>
+        <div class="strow"><img class="clawd cw-warn" src="assets/clawd/gif/clawd-error.gif" width="32" height="32"><span class="nm">consequence</span><span class="ds">terracotta · claws spread, slow pulse. The irreversible-send / error cue.</span><span class="lp once">once</span></div>
       </div>
       <div class="codeblk" style="margin-top:12px"><span class="c">// res/raw: clawd_idle.json, clawd_listening.json … (lowercase, no dashes)</span>
 <span class="k">enum</span> ActionState{ Idle,Listening,Working,Navigating,Success,Consequence }
