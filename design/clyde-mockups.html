@@ -446,6 +446,53 @@
   <span class="no">terracotta fills nothing — mark, link color, answer rule only</span>
 </div>
 
+<!-- ===================== HOW IT'S BUILT — ONE BESPOKE APP ===================== -->
+<section style="max-width:1360px;margin:0 auto 34px;padding:24px 26px;background:linear-gradient(180deg,#ffffff,var(--paper-deep));border:1px solid var(--line-2);border-radius:20px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:18px">
+    <div style="max-width:800px">
+      <div class="eyebrow" style="color:var(--clyde-deep)">how it's built · bespoke</div>
+      <div style="font-family:var(--disp);font-weight:800;font-size:30px;letter-spacing:-.02em;line-height:1.04;color:var(--ink);margin:9px 0 10px">One app. The brain runs <span style="color:var(--clyde-deep)">inside</span> it.</div>
+      <div style="font-family:var(--body);font-size:14.5px;line-height:1.55;color:var(--muted)">No Termux, no F-Droid, no second install. Clyde ships a <b style="color:var(--ink);font-weight:600">Linux runtime we built ourselves</b> — Node, the Claude CLI, and the brain — <b style="color:var(--ink);font-weight:600">compiled from source for our own package</b> and bundled in the APK. First launch unpacks it; the brain runs in-process, on your subscription.</div>
+    </div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right;line-height:1.8">
+      <div>prefix · dev.kris.clyde</div><div>arm64 · sideloaded</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:stretch;flex-wrap:wrap;gap:2px">
+    <div style="flex:1;min-width:172px;background:var(--paper);border:1px solid var(--line-2);border-radius:14px;padding:13px 14px">
+      <div class="eyebrow">in the apk</div>
+      <div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);margin:5px 0 4px">bootstrap-aarch64.zip</div>
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.55">Node · termux-exec · CA certs<br>brain + claude CLI baked in</div>
+    </div>
+    <div style="align-self:center;color:var(--clyde);font-family:var(--mono);font-size:16px;padding:0 6px">→</div>
+    <div style="flex:1;min-width:172px;background:var(--paper);border:1px solid var(--line-2);border-radius:14px;padding:13px 14px">
+      <div class="eyebrow">first run</div>
+      <div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);margin:5px 0 4px">unpack → files/usr</div>
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.55">clean-room Kotlin extractor<br>no Termux app code</div>
+    </div>
+    <div style="align-self:center;color:var(--clyde);font-family:var(--mono);font-size:16px;padding:0 6px">→</div>
+    <div style="flex:1;min-width:172px;background:var(--paper);border:1px solid var(--line-2);border-radius:14px;padding:13px 14px">
+      <div class="eyebrow">in-process</div>
+      <div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);margin:5px 0 4px">node server.js</div>
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.55">under the foreground service<br>W^X via libtermux-exec.so</div>
+    </div>
+    <div style="align-self:center;color:var(--clyde);font-family:var(--mono);font-size:16px;padding:0 6px">→</div>
+    <div style="flex:1;min-width:172px;background:var(--clyde-tint);border:1px solid var(--clyde);border-radius:14px;padding:13px 14px">
+      <div class="eyebrow" style="color:var(--clyde-deep)">the brain, live</div>
+      <div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);margin:5px 0 4px">127.0.0.1:8765</div>
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--clyde-deep);line-height:1.55">Claude on your subscription<br>you approve what matters</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:15px;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.02em">
+    <span><span style="color:var(--clyde-deep)">✦</span> built for our prefix — not stock Termux</span>
+    <span><span style="color:var(--clyde-deep)">✦</span> minimal: Node only, compiled from source</span>
+    <span><span style="color:var(--claude-deep)">✦</span> clean-room — Clyde's own code stays license-flexible</span>
+    <span><span style="color:var(--claude-deep)">✦</span> sideloaded · not Google Play</span>
+  </div>
+</section>
+
 <!-- ===================== THE FIRST-RUN FLOW =====================
      Login FIRST (you can't set up hands until Clyde can think), then a
      one-tap capability probe forks setup into two paths. Panels 01–04. -->
