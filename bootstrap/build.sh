@@ -27,11 +27,22 @@ else
   echo "TERMUX_APP__PACKAGE_NAME=$PKG" >> scripts/properties.sh
 fi
 
-# 2) Clean (mandatory after a prefix change) and build a MINIMAL bootstrap (arm64 only).
-./scripts/run-docker.sh ./clean.sh
+# 2) Trim the bootstrap to a MINIMAL node-only base. Stock build-bootstraps builds the full Termux
+#    base (apt/dpkg/perl/X11/fonts/...) which Clyde never uses (no on-device package management) and
+#    which is bloated + fragile (perl build). Override the base package list. Idempotent.
+if ! grep -q 'CLYDE minimal' scripts/build-bootstraps.sh; then
+  awk '/# Handle additional packages\./ && !d { print "\t\tPACKAGES=(\"termux-exec\" \"bash\" \"coreutils\") # CLYDE minimal"; d=1 } { print }' \
+    scripts/build-bootstraps.sh > scripts/build-bootstraps.sh.tmp && mv scripts/build-bootstraps.sh.tmp scripts/build-bootstraps.sh
+fi
+
+# 3) Clean only when asked. CLYDE_SKIP_CLEAN=1 reuses already-built package debs for a fast retry
+#    (clean is only truly needed the first time / after a prefix change).
+if [ "${CLYDE_SKIP_CLEAN:-0}" != "1" ]; then
+  ./scripts/run-docker.sh ./clean.sh
+fi
 ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
   --architectures "$ARCH" \
-  --add nodejs-lts,termux-exec,ca-certificates
+  --add nodejs-lts,ca-certificates
 cp "bootstrap-$ARCH.zip" "$WORK/bootstrap-$ARCH.zip"
 
 # 3) Inject the esbuild-bundled brain + the JS claude-code CLI; regenerate SYMLINKS.txt.
