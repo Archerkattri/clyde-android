@@ -1,5 +1,7 @@
 package dev.kris.clyde
 
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,7 +13,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import dev.kris.clyde.home.HomeScreen
+import dev.kris.clyde.service.AgentOrchestratorService
 import dev.kris.clyde.login.LoginScreen
 import dev.kris.clyde.login.VerifyScreen
 import dev.kris.clyde.setup.SetupScreen
@@ -30,6 +34,7 @@ private enum class Screen { Login, Verify, Setup, Home }
 
 @Composable
 private fun ClydeRoot() {
+    val ctx = LocalContext.current
     var screen by remember { mutableStateOf(if (Prefs.signedIn) Screen.Home else Screen.Login) }
     Surface(modifier = Modifier.fillMaxSize(), color = ClydeColor.Paper) {
         when (screen) {
@@ -39,7 +44,10 @@ private fun ClydeRoot() {
                 screen = Screen.Setup
             })
             Screen.Setup -> SetupScreen(onDone = { screen = Screen.Home })
-            Screen.Home -> HomeScreen(onAsk = { /* assist overlay wired in a later milestone */ })
+            Screen.Home -> HomeScreen(onAsk = {
+                val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_ASSIST)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+            })
         }
     }
 }

@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import dev.kris.clyde.R
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.bridge.LocalControlServer
+import dev.kris.clyde.overlay.OverlayController
 import dev.kris.clyde.util.Prefs
 import dev.kris.clyde.voice.VoiceIO
 import fi.iki.elonen.NanoHTTPD
@@ -34,12 +35,14 @@ class AgentOrchestratorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var voice: VoiceIO
+    private lateinit var overlay: OverlayController
     private var server: LocalControlServer? = null
     private val sessionId = "app-${System.currentTimeMillis()}"
 
     override fun onCreate() {
         super.onCreate()
         voice = VoiceIO(this)
+        overlay = OverlayController(applicationContext)
         startInForeground()
         startServer()
     }
@@ -51,8 +54,8 @@ class AgentOrchestratorService : Service() {
                 ctx = applicationContext,
                 voice = voice,
                 key = Prefs.clydeKey,
-                confirmHandler = { _, _ -> Pair(false, null) }, // TODO: ConfirmSheet overlay (next milestone)
-                overlayStatus = { _, _ -> },                    // TODO: status bubble overlay
+                confirmHandler = { summary, details -> overlay.confirmBlocking(summary, details) },
+                overlayStatus = { text, _ -> overlay.status(text) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -66,20 +69,24 @@ class AgentOrchestratorService : Service() {
     }
 
     private fun beginAssist() {
+        overlay.showSummon()
         voice.listen(
-            onPartial = { },
-            onFinal = { text -> if (text.isNotBlank()) handle(text) },
-            onError = { Log.w(TAG, "STT: $it") },
+            onPartial = { overlay.transcript(it) },
+            onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
+            onError = { overlay.status("Didn't catch that"); Log.w(TAG, "STT: $it") },
         )
     }
 
     private fun handle(text: String) {
+        overlay.status("Thinking…")
         scope.launch {
             BrainClient.query(text, sessionId) { ev ->
                 when (ev.optString("type")) {
-                    "final" -> voice.speak(ev.optString("text"))
-                    "error" -> voice.speak("Sorry — ${ev.optString("text")}")
-                    else -> { /* status/action/delta → overlay (next milestone) */ }
+                    "status" -> overlay.status(ev.optString("text"))
+                    "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
+                    "final" -> ev.optString("text").let { overlay.answer(it); voice.speak(it) }
+                    "error" -> ev.optString("text").let { overlay.answer("Sorry — $it"); voice.speak("Sorry, $it") }
+                    else -> {}
                 }
             }
         }
@@ -119,6 +126,7 @@ class AgentOrchestratorService : Service() {
     override fun onDestroy() {
         server?.stop()
         voice.destroy()
+        overlay.destroy()
         scope.cancel()
         super.onDestroy()
     }

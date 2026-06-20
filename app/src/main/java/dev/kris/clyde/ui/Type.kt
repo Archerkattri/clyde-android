@@ -25,6 +25,12 @@ val Mono = FontFamily(
     Font(R.font.ibm_plex_mono, FontWeight.Normal),
     Font(R.font.ibm_plex_mono_medium, FontWeight.Medium),
 )
+// Claude's answer voice — warm serif (Source Serif 4, variable).
+val Serif = FontFamily(
+    Font(R.font.source_serif, FontWeight.Normal),
+    Font(R.font.source_serif, FontWeight.Medium),
+    Font(R.font.source_serif, FontWeight.SemiBold),
+)
 
 val ClydeTypography = Typography(
     displayLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, letterSpacing = (-0.02).em),
