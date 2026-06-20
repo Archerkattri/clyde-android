@@ -1,0 +1,18 @@
+<resources>
+    <!-- Splash/host theme shown before Compose draws. Light, warm. -->
+    <style name="Theme.Clyde" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:statusBarColor">@color/paper</item>
+        <item name="android:navigationBarColor">@color/paper</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- Transparent theme for the assist trigger activity. -->
+    <style name="Theme.Clyde.Translucent" parent="Theme.Clyde">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+</resources>
