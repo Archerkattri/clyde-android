@@ -1,0 +1,33 @@
+# --- secrets ---
+.env
+*.env
+!*.env.example
+brain/.env
+
+# --- node / brain ---
+node_modules/
+brain/dist/
+*.log
+brain.log
+npm-debug.log*
+
+# --- android / app ---
+.gradle/
+app/build/
+build/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+.cxx/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# --- design render artifacts (keep source .html, ignore throwaway renders) ---
+design/*.tmp.png

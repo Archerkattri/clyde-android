@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clyde — design board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#080D0C; --ink-2:#0C1413; --panel:#0F1A18; --panel-2:#13201E;
+    --line:#1E322E; --line-2:#2A463F;
+    --text:#EAF4EF; --muted:#7E9A93; --faint:#51665F;
+    --signal:#56E6C0;
+    --t0:#3FD08A; --t1:#45B6F0; --t2:#F4B23E; --t3:#FB5E6D;
+    --disp:"Bricolage Grotesque",sans-serif;
+    --body:"Hanken Grotesk",sans-serif;
+    --mono:"IBM Plex Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);
+    -webkit-font-smoothing:antialiased;padding:40px;
+    background-image:radial-gradient(1200px 600px at 80% -10%, rgba(86,230,192,.06), transparent 60%);}
+  .board-head{max-width:1360px;margin:0 auto 34px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .wordmark{font-family:var(--disp);font-weight:800;font-size:46px;letter-spacing:-.02em;line-height:.9}
+  .wordmark .dot{color:var(--signal)}
+  .tagline{font-family:var(--disp);font-weight:500;font-size:17px;color:var(--muted);margin-top:8px;letter-spacing:-.01em}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .legend .sw{display:inline-flex;align-items:center;gap:7px}
+  .legend .chip{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  .grid{max-width:1360px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px;align-items:start}
+
+  .caption{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:0 0 12px 6px;display:flex;gap:8px;align-items:center}
+  .caption b{color:var(--signal);font-weight:500}
+
+  /* ---- phone frame ---- */
+  .phone{width:100%;max-width:392px;margin:0 auto;background:var(--ink-2);border:1px solid var(--line);
+    border-radius:34px;padding:12px;box-shadow:0 30px 60px -30px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03)}
+  .screen{background:var(--ink);border-radius:24px;overflow:hidden;border:1px solid var(--line);position:relative;min-height:720px;display:flex;flex-direction:column}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:12px 18px 4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .statusbar .r{display:flex;gap:8px;align-items:center}
+  .body{padding:14px 18px 20px;flex:1;display:flex;flex-direction:column}
+
+  /* ---- tier ladder (signature) ---- */
+  .ladder{display:flex;flex-direction:column-reverse;gap:8px}
+  .rung{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;background:var(--panel);
+    border:1px solid var(--line);position:relative;overflow:hidden}
+  .rung .bar{width:4px;align-self:stretch;border-radius:3px;background:var(--line-2)}
+  .rung .meta{flex:1;min-width:0}
+  .rung .t{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
+  .rung .n{font-weight:600;font-size:14px;letter-spacing:-.01em}
+  .rung .d{font-size:12px;color:var(--muted);margin-top:1px}
+  .rung .state{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+    border:1px solid var(--line-2);border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .rung.live{background:var(--panel-2)}
+  .rung.live .state{color:var(--ink);border-color:transparent}
+  .rung[data-tier="0"].live .bar{background:var(--t0)} .rung[data-tier="0"].live .state{background:var(--t0)} .rung[data-tier="0"].live{box-shadow:inset 0 0 0 1px rgba(63,208,138,.35), 0 0 30px -16px var(--t0)}
+  .rung[data-tier="1"].live .bar{background:var(--t1)} .rung[data-tier="1"].live .state{background:var(--t1)} .rung[data-tier="1"].live{box-shadow:inset 0 0 0 1px rgba(69,182,240,.35), 0 0 30px -16px var(--t1)}
+  .rung[data-tier="2"].live .bar{background:var(--t2)} .rung[data-tier="2"].live .state{background:var(--t2)} .rung[data-tier="2"].live{box-shadow:inset 0 0 0 1px rgba(244,178,62,.35), 0 0 30px -16px var(--t2)}
+  .rung[data-tier="3"].live .bar{background:var(--t3)} .rung[data-tier="3"].live .state{background:var(--t3)} .rung[data-tier="3"].live{box-shadow:inset 0 0 0 1px rgba(251,94,109,.35), 0 0 30px -16px var(--t3)}
+  .rung .ic{color:var(--faint)}
+  .rung.live[data-tier="0"] .ic{color:var(--t0)} .rung.live[data-tier="1"] .ic{color:var(--t1)} .rung.live[data-tier="2"] .ic{color:var(--t2)} .rung.live[data-tier="3"] .ic{color:var(--t3)}
+
+  /* ---- generic bits ---- */
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .h1{font-family:var(--disp);font-weight:700;font-size:25px;letter-spacing:-.02em;line-height:1.05;margin:8px 0}
+  .h2{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .lead{color:var(--muted);font-size:14px;line-height:1.5}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+    padding:4px 10px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted)}
+  .pill.sig{color:var(--signal);border-color:rgba(86,230,192,.4)}
+  .pill.t0{color:var(--t0);border-color:rgba(63,208,138,.45)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:14px;
+    font-family:var(--body);font-weight:600;font-size:15px;border:1px solid var(--line-2);background:var(--panel);color:var(--text);cursor:pointer}
+  .btn.primary{background:var(--signal);color:#05221C;border-color:transparent}
+  .btn.ghost{background:transparent;color:var(--muted)}
+  .btn.danger{background:transparent;color:var(--t3);border-color:rgba(251,94,109,.4)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+  .divider{height:1px;background:var(--line);margin:14px 0}
+  .ti{font-style:normal}
+
+  /* check list */
+  .step{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+  .step:first-child{border-top:none}
+  .step .mark{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);color:var(--faint)}
+  .step.done .mark{background:var(--t0);color:#04231A;border-color:transparent}
+  .step.active .mark{border-color:var(--signal);color:var(--signal)}
+  .step .s-n{font-weight:600;font-size:14px}
+  .step .s-d{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+  .step .s-d .hint{color:var(--t2)}
+  .step.active{}
+  .progress{height:5px;background:var(--panel);border-radius:999px;overflow:hidden;margin:6px 0 4px}
+  .progress > i{display:block;height:100%;width:66%;background:var(--signal)}
+
+  /* listening orb */
+  .orb-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
+  .orb{width:148px;height:148px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%, rgba(86,230,192,.28), rgba(86,230,192,.04) 62%, transparent 70%);
+    box-shadow:0 0 70px -8px rgba(86,230,192,.45)}
+  .orb::before,.orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(86,230,192,.35)}
+  .orb::after{inset:-18px;border-color:rgba(86,230,192,.14)}
+  .orb .core{width:62px;height:62px;border-radius:50%;background:var(--signal);box-shadow:0 0 40px -4px var(--signal)}
+  .transcript{font-family:var(--disp);font-weight:500;font-size:21px;letter-spacing:-.01em;line-height:1.25;max-width:280px}
+  .transcript .ghost{color:var(--faint)}
+
+  /* result */
+  .result .top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .result .ok{width:30px;height:30px;border-radius:50%;background:var(--t0);color:#04231A;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0}
+  .kv .k{color:var(--muted)} .kv .v{font-family:var(--mono);font-size:12px}
+  .trace{font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.7}
+  .trace .ar{color:var(--t0)}
+
+  /* confirm sheet (faux viewport) */
+  .sheetview{min-height:720px;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;border-radius:24px;overflow:hidden}
+  .sheet{width:100%;background:var(--ink-2);border-top:1px solid var(--line-2);border-radius:24px 24px 0 0;padding:18px 18px 22px;box-shadow:0 -20px 50px -20px rgba(0,0,0,.7)}
+  .grip{width:38px;height:4px;border-radius:3px;background:var(--line-2);margin:0 auto 16px}
+  .recipient{display:flex;align-items:center;gap:12px}
+  .avatar{width:42px;height:42px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:500;color:var(--signal)}
+  .msgbubble{background:var(--panel);border:1px solid var(--line);border-radius:14px;border-bottom-left-radius:4px;padding:12px 14px;font-size:14px;line-height:1.45;margin:14px 0}
+  .token{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--ink);border:1px dashed var(--line-2);border-radius:10px;padding:9px 12px;margin-top:4px}
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding:12px 0}
+  .switch{width:40px;height:23px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line-2);position:relative;flex:none}
+  .switch > i{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--faint)}
+
+  /* dashboard */
+  .statrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .stat .b{font-family:var(--disp);font-weight:700;font-size:20px;margin-top:4px;letter-spacing:-.01em}
+  .stat .b.green{color:var(--t0)}
+  .logitem{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+  .logitem:first-child{border-top:none}
+  .logitem .dotc{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;background:var(--faint)}
+  .logitem .dotc.c{background:var(--t0)} .logitem .dotc.r{background:var(--t3)}
+  .logitem .lt{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+  .seg > div{flex:1;text-align:center;font-size:13px;font-weight:600;padding:9px;border-radius:9px;color:var(--muted)}
+  .seg > div.on{background:var(--signal);color:#05221C}
+
+  /* status bubble */
+  .bubblewrap{min-height:720px;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;
+    background:linear-gradient(180deg,#101314,#0a0c0d);border-radius:24px;
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.015) 0 14px, transparent 14px 28px)}
+  .bubble{width:88%;background:rgba(12,20,19,.92);border:1px solid var(--line-2);border-radius:16px;padding:12px 14px;
+    box-shadow:0 18px 40px -18px rgba(0,0,0,.8), 0 0 40px -22px var(--signal);backdrop-filter:blur(8px)}
+  .bubble .row1{display:flex;align-items:center;gap:10px}
+  .bubble .live-dot{width:9px;height:9px;border-radius:50%;background:var(--signal);box-shadow:0 0 12px var(--signal)}
+  .bubble .doing{font-size:13.5px;font-weight:600;flex:1}
+  .bubble .sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:7px}
+  .bubble .abort{font-size:12px;color:var(--t3);font-weight:600}
+  .miniladder{display:flex;gap:4px;margin-top:11px}
+  .miniladder > i{height:5px;flex:1;border-radius:3px;background:var(--line-2)}
+  .miniladder > i.a0{background:var(--t0)} .miniladder > i.a1{background:var(--t1)} .miniladder > i.a2{background:var(--t2)}
+
+  .footer{max-width:1360px;margin:40px auto 0;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em;border-top:1px solid var(--line);padding-top:18px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+
+<div class="board-head">
+  <div>
+    <div class="kicker">claude · android assistant</div>
+    <div class="wordmark" style="margin-top:10px">Clyde<span class="dot">.</span></div>
+    <div class="tagline">Claude, with hands. Your phone, supervised.</div>
+  </div>
+  <div class="legend">
+    <span class="sw"><span class="chip" style="background:var(--t0)"></span>T0 · intents</span>
+    <span class="sw"><span class="chip" style="background:var(--t1)"></span>T1 · accessibility</span>
+    <span class="sw"><span class="chip" style="background:var(--t2)"></span>T2 · shizuku</span>
+    <span class="sw"><span class="chip" style="background:var(--t3)"></span>T3 · root</span>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- ============ 1. LISTENING / ASSIST ============ -->
+  <div>
+    <div class="caption"><b>01</b> · assist gesture → listening</div>
+    <div class="phone"><div class="screen">
+      <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="pill sig">● listening</span>
+          <span class="pill">tap to type</span>
+        </div>
+        <div class="orb-wrap">
+          <div class="orb"><div class="core"></div></div>
+          <div class="transcript">text mom I'm on<br>my way<span class="ghost"> …</span></div>
+          <div class="eyebrow">claude · subscription · streaming</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 2. SETUP WIZARD ============ -->
+  <div>
+    <div class="caption"><b>02</b> · setup · arm the tiers</div>
+    <div class="phone"><div class="screen">
+      <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
+      <div class="body">
+        <div class="eyebrow">setup · 4 of 6</div>
+        <div class="h1">Arm Clyde's hands.</div>
+        <div class="progress"><i></i></div>
+        <div class="lead" style="margin-bottom:14px">Each tier you grant unlocks a cleaner way to act. Tier 0 always works.</div>
+
+        <div class="ladder" style="margin-bottom:16px">
+          <div class="rung live" data-tier="0"><span class="bar"></span><span class="ic ti">◧</span><div class="meta"><div class="t">tier 0</div><div class="n">App &amp; system intents</div><div class="d">Alarms, calls, SMS, navigation</div></div><span class="state">live</span></div>
+          <div class="rung live" data-tier="1"><span class="bar"></span><span class="ic ti">◉</span><div class="meta"><div class="t">tier 1</div><div class="n">Accessibility</div><div class="d">See &amp; tap any app</div></div><span class="state">live</span></div>
+          <div class="rung live" data-tier="2"><span class="bar"></span><span class="ic ti">⌘</span><div class="meta"><div class="t">tier 2</div><div class="n">Shizuku · ADB</div><div class="d">input, pm, settings</div></div><span class="state">live</span></div>
+          <div class="rung" data-tier="3"><span class="bar"></span><span class="ic ti">⚿</span><div class="meta"><div class="t">tier 3</div><div class="n">Root</div><div class="d">Optional · unrestricted</div></div><span class="state">off</span></div>
+        </div>
+
+        <div class="step done"><div class="mark">✓</div><div><div class="s-n">Display over other apps</div></div></div>
+        <div class="step active"><div class="mark">4</div><div><div class="s-n">Enable accessibility service</div><div class="s-d">Greyed out? <span class="hint">App info ▸ ⋮ ▸ Allow restricted settings</span> first.</div></div></div>
+        <div class="btn primary" style="margin-top:14px">Open accessibility settings</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 3. CONFIRM SHEET ============ -->
+  <div>
+    <div class="caption"><b>03</b> · consequential action → confirm</div>
+    <div class="phone"><div class="screen">
+      <div class="sheetview">
+        <div class="sheet">
+          <div class="grip"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <span class="eyebrow">clyde wants to</span>
+            <span class="pill t0">tier 0 · send_sms</span>
+          </div>
+          <div class="h2" style="margin-bottom:14px">Send a text message</div>
+          <div class="recipient">
+            <div class="avatar">엄마</div>
+            <div><div class="s-n">Mom</div><div class="s-d" style="font-family:var(--mono);font-size:12px">+82 10-2934-7715</div></div>
+          </div>
+          <div class="msgbubble">On my way, ~15 min.</div>
+          <div class="token"><span>one-time token · tok_a91f6c</span><span>expires 28s</span></div>
+          <div class="toggle"><span>Always allow texting saved contacts</span><span class="switch"><i></i></span></div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <div class="btn ghost" style="flex:1">Don't send</div>
+            <div class="btn primary" style="flex:1.4">Send message</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 4. CONTROL DASHBOARD ============ -->
+  <div>
+    <div class="caption"><b>04</b> · home · control center</div>
+    <div class="phone"><div class="screen">
+      <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
+      <div class="body">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="wordmark" style="font-size:28px">Clyde<span class="dot">.</span></div>
+          <span class="pill sig">● online</span>
+        </div>
+        <div class="statrow">
+          <div class="stat"><div class="l">auth</div><div class="b green">Subscription</div></div>
+          <div class="stat"><div class="l">brain · 8765</div><div class="b">240<span style="font-size:13px;color:var(--muted)">ms</span></div></div>
+        </div>
+
+        <div class="eyebrow" style="margin:6px 0 8px">live tiers</div>
+        <div class="ladder">
+          <div class="rung live" data-tier="0"><span class="bar"></span><div class="meta"><div class="n">Intents</div></div><span class="state">live</span></div>
+          <div class="rung live" data-tier="1"><span class="bar"></span><div class="meta"><div class="n">Accessibility</div></div><span class="state">live</span></div>
+          <div class="rung live" data-tier="2"><span class="bar"></span><div class="meta"><div class="n">Shizuku</div></div><span class="state">live</span></div>
+          <div class="rung" data-tier="3"><span class="bar"></span><div class="meta"><div class="n">Root</div></div><span class="state">off</span></div>
+        </div>
+
+        <div class="eyebrow" style="margin:16px 0 6px">recent actions</div>
+        <div class="card" style="padding:4px 14px">
+          <div class="logitem"><span class="dotc c"></span><div style="flex:1"><div>Texted Mom · "On my way…"</div><div class="lt">send_sms · approved</div></div><span class="lt">2m</span></div>
+          <div class="logitem"><span class="dotc"></span><div style="flex:1"><div>Opened Spotify</div><div class="lt">launch_app</div></div><span class="lt">2m</span></div>
+          <div class="logitem"><span class="dotc"></span><div style="flex:1"><div>Set 10-minute timer</div><div class="lt">set_timer</div></div><span class="lt">1h</span></div>
+        </div>
+
+        <div style="flex:1"></div>
+        <div class="seg" style="margin:16px 0 10px"><div class="on">Clyde</div><div>Gemini</div></div>
+        <div class="btn danger">Stop Clyde · revoke tokens</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 5. STATUS BUBBLE (overlay) ============ -->
+  <div>
+    <div class="caption"><b>05</b> · overlay · "about to do X"</div>
+    <div class="phone"><div class="screen">
+      <div class="bubblewrap">
+        <div class="bubble">
+          <div class="row1">
+            <span class="live-dot"></span>
+            <span class="doing">Tapping "Follow" on @nasa</span>
+            <span class="abort">Stop</span>
+          </div>
+          <div class="sub">ui_dump → tap · node #42 · accessibility</div>
+          <div class="miniladder"><i class="a0"></i><i class="a1"></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 6. RESULT ============ -->
+  <div>
+    <div class="caption"><b>06</b> · spoken answer + action trace</div>
+    <div class="phone"><div class="screen">
+      <div class="statusbar"><span>9:41</span><div class="r"><span>LTE</span><span>100%</span></div></div>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="pill sig">● spoke reply</span>
+          <span class="pill t0">tier 0</span>
+        </div>
+        <div class="result" style="margin-top:24px">
+          <div class="top"><div class="ok">✓</div><div class="h2">Sent.</div></div>
+          <div class="lead">I texted Mom "On my way, ~15 min."</div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <div class="kv"><span class="k">recipient</span><span class="v">Mom · +82 10-…</span></div>
+          <div class="divider"></div>
+          <div class="kv"><span class="k">method</span><span class="v">send_sms intent</span></div>
+          <div class="divider"></div>
+          <div class="kv"><span class="k">confirmed</span><span class="v">tok_a91f6c ✓</span></div>
+        </div>
+        <div class="eyebrow" style="margin:18px 0 8px">trace</div>
+        <div class="trace">
+          <div><span class="ar">→</span> capabilities() · T0,T1,T2 live</div>
+          <div><span class="ar">→</span> resolve contact "mom"</div>
+          <div><span class="ar">→</span> confirm() · approved</div>
+          <div><span class="ar">→</span> send_sms() · ok</div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="btn ghost">Ask something else</div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span>clyde · design system v1 — console</span>
+  <span>bricolage grotesque · hanken grotesk · ibm plex mono</span>
+  <span>#080D0C · #56E6C0 · tier ramp 3FD08A→45B6F0→F4B23E→FB5E6D</span>
+</div>
+
+</body>
+</html>
