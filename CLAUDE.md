@@ -11,9 +11,28 @@ An Android app that replaces Gemini as the system assistant, driven by **Claude 
 - Do not build an in-app Anthropic API client. Device intelligence comes from the Agent SDK process, not a homemade client.
 
 ## Where this repo is built vs where it runs
-- **Built/edited on:** a Windows 11 PC (this machine). Node 20 + git present; no Android SDK/JDK installed here yet.
+- **Built/edited on:** a Windows 11 PC (this machine). Toolchain now installed under `C:\Users\krish\clyde-toolchain` (JDK, Android SDK 36, Gradle), plus Android Studio (build with its JBR 21) and **WSL2 Ubuntu-24.04 + Docker** (for the embedded-runtime bootstrap build). Node 20 + git present. The app DOES compile here (`gradlew :app:assembleDebug` on JBR 21).
 - **`brain/` runs in:** Termux on the Android phone (Node). It is `tsc`-buildable on the PC for type-checking.
 - **`app/` runs on:** the Android phone. Build the APK with Android Studio or on-device Gradle (see `scripts/`). The PC can edit but not compile it until the Android SDK is installed.
+
+## Packaging: embedded runtime (one sideloaded APK, no F-Droid) — IN PROGRESS
+Goal: ship Clyde as ONE sideloaded APK with the brain running in-process — no separate Termux app, no
+F-Droid, no manual paste. NOT Google-Play-distributable (W^X exec + bundled GPL binaries) → sideload only.
+- A **bespoke** Termux-style bootstrap is built FOR OUR PREFIX (`dev.kris.clyde`) via `bootstrap/build.sh`
+  (forked termux-packages in WSL2/Docker; multi-hour Node-from-source compile). Minimal: Node +
+  `termux-exec` + ca-certificates, with the esbuild-bundled brain + the JS `@anthropic-ai/claude-code`
+  CLI baked in. Output `app/src/main/assets/bootstrap-aarch64.zip` (gitignored; ~110–125 MB; arm64 only).
+- App side is **clean-room** (no Termux GPLv3 code → Clyde stays license-flexible; see `NOTICE.md`):
+  `runtime/EmbeddedRuntime.kt` extracts the bootstrap on first run; `runtime/BrainRunner.kt` runs `node`
+  under `AgentOrchestratorService` with `LD_PRELOAD=libtermux-exec.so` (the W^X workaround). Both GUARDED
+  on `EmbeddedRuntime.isBundled()` so builds without the asset keep the external-Termux path working.
+- Brain: `CLAUDE_CLI_PATH` points the SDK at the bundled JS CLI. The native CLI is glibc-only — pin the
+  JS release (claude-code 2.1.112). `CLAUDE_CODE_OAUTH_TOKEN` is the SUBSCRIPTION headless token (allowed).
+- WSL build env: build dir `/opt/clyde-work` chowned to uid **1001** (the container's `builder`);
+  `CLYDE_BUILD_WORK=/opt/clyde-work bash bootstrap/build.sh`.
+- TODO: finish the bootstrap build; in-app `claude login`/`setup-token` flow (headless); embedded-mode
+  setup screen; on-device W^X + end-to-end validation (needs an arm64 phone). The "Termux companion"
+  (curl wizard / `termux/setup.sh`) is the FALLBACK for non-embedded builds.
 
 ## Architecture (see docs/architecture.md)
 - `app/` — Kotlin Android shell, **Jetpack Compose + Material 3**. Key components: `AssistEntryActivity` (ACTION_ASSIST trigger), `AgentOrchestratorService` (foreground session owner, hosts `LocalControlServer`), `PhoneControlAccessibilityService` (Tier-1 hands), `VoiceIO`, `OverlayController`/`ConfirmSheet`, `GeminiRouter`, `CapabilityProbe`, `SettingsActivity` (setup wizard + control center).
