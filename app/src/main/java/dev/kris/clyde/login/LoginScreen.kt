@@ -37,8 +37,6 @@ import dev.kris.clyde.ui.PrimaryButton
 /** Panel 01 — Sign in with your Claude plan. Launches `claude login` in Termux. */
 @Composable
 fun LoginScreen(onStartSignIn: () -> Unit) {
-    val ctx = LocalContext.current
-    var termuxError by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,39 +72,16 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
             Text("powered by Claude · never an API key", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
         }
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Open Termux & start sign-in", onClick = {
-            if (TermuxRunCommand.startClaudeLogin(ctx)) {
-                termuxError = false
-                onStartSignIn()
-            } else {
-                termuxError = true
-            }
-        })
+        PrimaryButton("Get started", onClick = onStartSignIn)
         Spacer(Modifier.height(10.dp))
-        if (termuxError) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ClydeColor.TerracottaTint, RoundedCornerShape(12.dp))
-                    .border(1.dp, ClydeColor.Terracotta, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-            ) {
-                Text("Termux didn't accept the command.", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.5f.sp, color = ClydeColor.Ink)
-                Text(
-                    "Install Termux + Termux:API from F-Droid and enable allow-external-apps, then try again.",
-                    fontFamily = Body, fontSize = 12.5f.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
-                )
-            }
-        } else {
-            Text(
-                "Termux opens and runs claude login. Finish in your browser — Clyde never sees your password or token.",
-                fontFamily = Body,
-                fontSize = 12.5f.sp,
-                lineHeight = 18.sp,
-                color = ClydeColor.Muted,
-                textAlign = TextAlign.Center,
-            )
-        }
+        Text(
+            "Next: a one-time setup gets Clyde's brain running in Termux. Clyde never sees your password or token.",
+            fontFamily = Body,
+            fontSize = 12.5f.sp,
+            lineHeight = 18.sp,
+            color = ClydeColor.Muted,
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.weight(1f))
         Text(
             "Signing in on the phone is awkward? You can copy ~/.claude from a desktop where you've already run claude login.",

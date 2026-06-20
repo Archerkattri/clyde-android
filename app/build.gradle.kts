@@ -1,8 +1,23 @@
+import org.gradle.api.tasks.bundling.Tar
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Bundle the brain's source into the APK (as assets/brain.tgz) so the app can deliver it to Termux
+// over loopback during setup — no remote repo, always in sync with the app. node_modules/.env excluded.
+val bundleBrain by tasks.registering(Tar::class) {
+    archiveFileName.set("brain.tgz")
+    compression = org.gradle.api.tasks.bundling.Compression.GZIP
+    destinationDirectory.set(layout.projectDirectory.dir("src/main/assets"))
+    from(rootProject.layout.projectDirectory.dir("brain")) {
+        into("brain")
+        exclude("node_modules/**", "dist/**", ".env", ".env.local", "*.log")
+    }
+}
+tasks.named("preBuild") { dependsOn(bundleBrain) }
 
 android {
     namespace = "dev.kris.clyde"

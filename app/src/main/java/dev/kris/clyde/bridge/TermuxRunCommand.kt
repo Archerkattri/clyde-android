@@ -2,6 +2,8 @@ package dev.kris.clyde.bridge
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 
@@ -12,6 +14,22 @@ object TermuxRunCommand {
     private const val RUN_SERVICE = "com.termux.app.RunCommandService"
     private const val ACTION = "com.termux.RUN_COMMAND"
     private const val BASH = "/data/data/com.termux/files/usr/bin/bash"
+
+    /** Real check (not a guess): is the Termux app actually installed? Needs <queries> com.termux. */
+    fun isTermuxInstalled(ctx: Context): Boolean = try {
+        ctx.packageManager.getPackageInfo(TERMUX, 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    /** Open Termux's F-Droid page so the user can install it (Termux isn't on Google Play). */
+    fun openTermuxInstall(ctx: Context): Boolean = runCatching {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://f-droid.org/packages/com.termux/"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }.isSuccess
 
     /** Opens a visible Termux session running `claude login` so the user can finish OAuth. */
     fun startClaudeLogin(ctx: Context): Boolean = runInTermux(ctx, "claude login", background = false)

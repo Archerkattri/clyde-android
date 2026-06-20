@@ -25,6 +25,7 @@ import dev.kris.clyde.home.HomeScreen
 import dev.kris.clyde.service.AgentOrchestratorService
 import dev.kris.clyde.login.LoginScreen
 import dev.kris.clyde.login.VerifyScreen
+import dev.kris.clyde.setup.BrainSetupScreen
 import dev.kris.clyde.setup.SetupScreen
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeTheme
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { Login, Verify, Setup, Home }
+private enum class Screen { Login, BrainSetup, Verify, Setup, Home }
 
 @Composable
 private fun ClydeRoot() {
@@ -58,7 +59,11 @@ private fun ClydeRoot() {
             label = "screen",
         ) { s ->
             when (s) {
-                Screen.Login -> LoginScreen(onStartSignIn = { screen = Screen.Verify })
+                Screen.Login -> LoginScreen(onStartSignIn = { screen = Screen.BrainSetup })
+                Screen.BrainSetup -> BrainSetupScreen(
+                    onConnected = { screen = Screen.Verify },
+                    onSkip = { screen = Screen.Verify },
+                )
                 Screen.Verify -> VerifyScreen(onContinue = {
                     Prefs.signedIn = true
                     screen = Screen.Setup

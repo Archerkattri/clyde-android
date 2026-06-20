@@ -40,6 +40,9 @@ class LocalControlServer(
             if (!authorized(session)) {
                 return json(err("bad or missing X-Clyde-Key"), Response.Status.UNAUTHORIZED)
             }
+            // Loopback brain delivery for the Termux companion bootstrap (key-gated, non-secret).
+            if (session.uri == "/bootstrap.sh") return serveAsset("clyde-bootstrap.sh", "text/x-shellscript; charset=utf-8", stripCr = true)
+            if (session.uri == "/brain.tgz") return serveAsset("brain.tgz", "application/gzip", stripCr = false)
             val body = parseJson(session)
             val uri = session.uri
             val result: JSONObject = when {
@@ -159,4 +162,13 @@ class LocalControlServer(
 
     private fun json(obj: JSONObject, status: Response.Status = Response.Status.OK): Response =
         newFixedLengthResponse(status, "application/json", obj.toString())
+
+    /** Serve a bundled asset (the bootstrap script / brain tarball) to the Termux bootstrap. */
+    private fun serveAsset(name: String, mime: String, stripCr: Boolean): Response = try {
+        var bytes = ctx.assets.open(name).use { it.readBytes() }
+        if (stripCr) bytes = String(bytes, Charsets.UTF_8).replace("\r\n", "\n").toByteArray(Charsets.UTF_8)
+        newFixedLengthResponse(Response.Status.OK, mime, java.io.ByteArrayInputStream(bytes), bytes.size.toLong())
+    } catch (_: Exception) {
+        json(err("asset unavailable: $name"), Response.Status.INTERNAL_ERROR)
+    }
 }
