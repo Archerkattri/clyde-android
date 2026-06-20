@@ -7,7 +7,9 @@ PKG="dev.kris.clyde"
 ARCH="aarch64"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-WORK="$HERE/.work"
+# Heavy build artifacts: keep them off a slow /mnt/c mount when building under WSL by setting
+# CLYDE_BUILD_WORK to a native-Linux path (e.g. /root/clyde-work). Defaults to bootstrap/.work.
+WORK="${CLYDE_BUILD_WORK:-$HERE/.work}"
 TP="$WORK/termux-packages"
 
 command -v docker >/dev/null || { echo "!! Docker is required (see README.md)"; exit 1; }
