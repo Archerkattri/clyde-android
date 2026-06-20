@@ -66,11 +66,56 @@
             </intent-filter>
         </activity>
 
-        <!-- Added as those screens/tiers land (see docs/build-phases.md):
-             .assist.AssistEntryActivity (ACTION_ASSIST trigger),
-             .service.AgentOrchestratorService (FGS + LocalControlServer:8766),
-             .service.PhoneControlAccessibilityService (Tier-1 hands),
-             rikka.shizuku.ShizukuProvider (Tier-2). -->
+        <!-- ACTION_ASSIST trigger — makes Clyde selectable as the Digital assistant app. -->
+        <activity
+            android:name=".assist.AssistEntryActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:theme="@style/Theme.Clyde.Translucent">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Orchestrator: session owner + hosts LocalControlServer:8766. -->
+        <service
+            android:name=".service.AgentOrchestratorService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Conversational on-device assistant orchestrator" />
+        </service>
+
+        <!-- Tier-1 hands: accessibility engine. -->
+        <service
+            android:name=".service.PhoneControlAccessibilityService"
+            android:exported="false"
+            android:label="@string/a11y_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Shizuku provider (Tier-2). -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
     </application>
 </manifest>

@@ -44,6 +44,30 @@ object BrainClient {
         }
     }
 
+    /** Stream a query to the brain. Each NDJSON event (status/action/delta/final/error) → onEvent. */
+    suspend fun query(text: String, sessionId: String, onEvent: (JSONObject) -> Unit) = withContext(Dispatchers.IO) {
+        try {
+            val c = open("/query", "POST")
+            c.doOutput = true
+            c.readTimeout = 120_000
+            c.setRequestProperty("Content-Type", "application/json")
+            val payload = JSONObject().put("text", text).put("sessionId", sessionId).toString()
+            c.outputStream.use { it.write(payload.toByteArray()) }
+            if (c.responseCode in 200..299) {
+                c.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { line ->
+                        if (line.isNotBlank()) runCatching { onEvent(JSONObject(line)) }
+                    }
+                }
+            } else {
+                onEvent(JSONObject().put("type", "error").put("text", "brain ${c.responseCode}"))
+            }
+            c.disconnect()
+        } catch (e: Exception) {
+            onEvent(JSONObject().put("type", "error").put("text", "brain unreachable"))
+        }
+    }
+
     /** Kill switch — invalidate outstanding confirm tokens on the brain. */
     suspend fun kill(): Boolean = withContext(Dispatchers.IO) {
         try {
