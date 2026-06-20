@@ -1,30 +1,56 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { config, assertSubscriptionAuth } from "./config";
-import { runAgent, getSafety } from "./agent";
+import { timingSafeEqual } from "node:crypto";
+import { config, assertSubscriptionAuth, assertServerSafe, apiKeyPresent } from "./config";
+import { runAgent, haltActiveTurn } from "./agent";
 import type { AgentEvent } from "./types";
 
-// Fail loud if an API key would hijack subscription billing.
+// Fail loud if a credential override would hijack subscription billing, and fail closed
+// if the loopback secret / bind host aren't safe.
 assertSubscriptionAuth();
+assertServerSafe();
+
+const MAX_BODY = 256 * 1024;
+const MAX_INFLIGHT = 2;
+let inFlight = 0;
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 function authorized(req: IncomingMessage): boolean {
-  if (!config.clydeKey) return true; // dev mode: no key configured
-  return req.headers["x-clyde-key"] === config.clydeKey;
+  if (!config.clydeKey) return config.devNoAuth; // refuse unless dev-noauth opt-in
+  const h = req.headers["x-clyde-key"];
+  return typeof h === "string" && safeEqual(h, config.clydeKey);
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolveP) => {
+  return new Promise((resolveP, reject) => {
     let data = "";
-    req.on("data", (c) => (data += c));
+    let len = 0;
+    req.on("data", (c: Buffer) => {
+      len += c.length;
+      if (len > MAX_BODY) {
+        req.destroy();
+        reject(new Error("body too large"));
+        return;
+      }
+      data += c;
+    });
     req.on("end", () => resolveP(data));
+    req.on("error", () => resolveP(data));
   });
 }
 
 const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   const url = req.url ?? "/";
 
+  // Minimal liveness (no service banner). Auth-gated endpoints below.
   if (req.method === "GET" && url === "/healthz") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, service: "clyde-brain", auth: "subscription" }));
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 
@@ -34,17 +60,34 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Auth snapshot for the app's login/verify screen. The brain refuses to boot with an
-  // API key set, so apiKeyPresent is false at runtime; subscription is implied by booting.
   if (req.method === "GET" && url === "/auth/status") {
-    const apiKeyPresent = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== "");
+    const present = apiKeyPresent();
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, subscription: !apiKeyPresent, apiKeyPresent, plan: process.env.CLYDE_PLAN ?? null }));
+    res.end(JSON.stringify({ ok: true, subscription: !present, apiKeyPresent: present, plan: process.env.CLYDE_PLAN ?? null }));
+    return;
+  }
+
+  if (req.method === "POST" && url === "/kill") {
+    haltActiveTurn();
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, killed: true }));
     return;
   }
 
   if (req.method === "POST" && url === "/query") {
-    const raw = await readBody(req);
+    if (inFlight >= MAX_INFLIGHT) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "busy" }));
+      return;
+    }
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch {
+      res.writeHead(413, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "request too large" }));
+      return;
+    }
     let parsed: { text?: unknown; sessionId?: unknown };
     try {
       parsed = JSON.parse(raw || "{}");
@@ -61,26 +104,17 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       return;
     }
 
-    res.writeHead(200, {
-      "content-type": "application/x-ndjson",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-    });
+    res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-cache", connection: "keep-alive" });
     const emit = (ev: AgentEvent) => res.write(JSON.stringify(ev) + "\n");
+    inFlight++;
     try {
       await runAgent({ text, sessionId }, emit);
     } catch (e) {
       emit({ type: "error", text: String(e) });
+    } finally {
+      inFlight--;
+      res.end();
     }
-    res.end();
-    return;
-  }
-
-  // kill switch: invalidate all outstanding confirm tokens
-  if (req.method === "POST" && url === "/kill") {
-    getSafety().invalidateAll();
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, killed: true }));
     return;
   }
 
@@ -90,7 +124,4 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
 server.listen(config.brainPort, config.brainHost, () => {
   console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: subscription)`);
-  if (!config.clydeKey) {
-    console.warn("[clyde] WARNING: CLYDE_KEY not set — loopback API is unauthenticated (dev only).");
-  }
 });

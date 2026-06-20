@@ -9,6 +9,7 @@
     "start": "tsx src/server.ts",
     "oneshot": "tsx src/oneshot.ts",
     "typecheck": "tsc --noEmit",
+    "test": "tsx test/run.ts",
     "build": "tsc --noEmit"
   },
   "dependencies": {

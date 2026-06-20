@@ -42,15 +42,15 @@ export function makeTier0Intents(ctx: ToolCtx) {
 
     tool(
       "open_url",
-      "Open a URL. If the URL came from a message or email, show the full URL in your confirmation first.",
-      { url: z.string() },
-      async (a) => fire("open_url", a, `Opening ${a.url}.`)
+      "Open a URL. Consequential — confirm() first; if the URL came from a message/email, the confirm sheet shows the full URL.",
+      { url: z.string(), token: z.string().describe("token from confirm()") },
+      async (a) => fire("open_url", { url: a.url }, `Opening ${a.url}.`)
     ),
 
     tool(
       "share_text",
-      "Share text to another app via the system share sheet.",
-      { content: z.string(), targetPackage: z.string().optional() },
+      "Share text to another app via the system share sheet. Consequential — confirm() first.",
+      { content: z.string(), targetPackage: z.string().optional(), token: z.string().describe("token from confirm()") },
       async (a) => fire("share_text", { text: a.content, targetPackage: a.targetPackage }, "Shared.")
     ),
 
@@ -62,7 +62,7 @@ export function makeTier0Intents(ctx: ToolCtx) {
       async (a) => {
         const g = gate(ctx, "start_call", a);
         if (g) return g;
-        return fire("start_call", { number: a.number, contact: a.contact }, `Calling ${a.contact ?? a.number}.`);
+        return fire("start_call", { number: a.number, contact: a.contact, token: a.token }, `Calling ${a.contact ?? a.number}.`);
       }
     ),
 
@@ -74,7 +74,7 @@ export function makeTier0Intents(ctx: ToolCtx) {
         const g = gate(ctx, "send_sms", a);
         if (g) return g;
         ctx.emit({ type: "status", text: "sending text…" });
-        return fire("send_sms", { to: a.to, body: a.body }, "Sent.");
+        return fire("send_sms", { to: a.to, body: a.body, token: a.token }, "Sent.");
       }
     ),
 
@@ -93,7 +93,7 @@ export function makeTier0Intents(ctx: ToolCtx) {
         if (g) return g;
         return fire(
           "add_calendar_event",
-          { title: a.title, startIso: a.startIso, endIso: a.endIso, location: a.location },
+          { title: a.title, startIso: a.startIso, endIso: a.endIso, location: a.location, token: a.token },
           `Added "${a.title}".`
         );
       }

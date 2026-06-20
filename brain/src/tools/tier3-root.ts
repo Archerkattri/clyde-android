@@ -42,7 +42,7 @@ export function makeTier3Root(ctx: ToolCtx) {
     tool(
       "grant_signature_perm",
       "Grant a signature/privileged permission to a package (e.g. for VoiceInteractionService experiments). Consequential.",
-      { pkg: z.string(), permission: z.string(), token: z.string(), userAsked: z.boolean().optional() },
+      { pkg: z.string(), permission: z.string(), token: z.string() },
       async (a) => {
         const g = gate(ctx, "grant_signature_perm", a);
         if (g) return g;

@@ -1,6 +1,8 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import type { ToolCtx } from "../context";
+import { argsHash } from "../safety";
+import { describeAction } from "../describe";
 import { json, text, err } from "./helpers";
 
 /** Always-on tools: capabilities() and confirm(). */
@@ -15,18 +17,21 @@ export function makeMetaTools(ctx: ToolCtx) {
 
     tool(
       "confirm",
-      "Ask the user to approve a consequential action. Returns a one-time token to pass to the action tool. Make the summary specific and in the user's terms.",
+      "Approve a consequential action BEFORE running it. Pass the exact tool you will run as `action` and the exact args as `params` (no token). Clyde shows the user an approval sheet describing that action and returns a one-time token bound to it. Then call the action tool with the SAME params plus this token. The token only works for that exact action — you cannot reuse it for anything else.",
       {
-        summary: z.string().describe("e.g. \"Text Mom: 'on my way'?\""),
-        details: z.string().optional().describe("extra context shown under the summary"),
+        action: z.string().describe("the tool name you intend to run, e.g. \"send_sms\""),
+        params: z.record(z.string(), z.any()).optional().describe("the exact args for that tool (omit the token)"),
       },
       async (a) => {
-        ctx.emit({ type: "need_confirm", summary: a.summary, details: a.details });
-        const r = await ctx.app.confirm({ summary: a.summary, details: a.details });
+        const params = (a.params ?? {}) as Record<string, unknown>;
+        const { summary, details } = describeAction(a.action, params);
+        ctx.emit({ type: "need_confirm", summary, details });
+        const r = await ctx.app.confirm({ summary, details });
         if (!r.ok || !r.result) return err(`could not show the confirmation sheet: ${r.error ?? "no response"}`);
         const { approved, token } = r.result;
         if (!approved || !token) return text(JSON.stringify({ approved: false }));
-        ctx.safety.registerToken(token, a.summary);
+        // bind the approval to THIS action + args; the action tool must match exactly
+        ctx.safety.registerToken(token, a.action, argsHash(params));
         return text(JSON.stringify({ approved: true, token }));
       }
     ),

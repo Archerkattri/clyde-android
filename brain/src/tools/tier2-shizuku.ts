@@ -34,7 +34,7 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
     tool(
       "pm_grant",
       "Grant a runtime permission to a package. Consequential.",
-      { pkg: z.string(), permission: z.string(), token: z.string(), userAsked: z.boolean().optional() },
+      { pkg: z.string(), permission: z.string(), token: z.string() },
       async (a) => {
         const g = gate(ctx, "pm_grant", a);
         if (g) return g;

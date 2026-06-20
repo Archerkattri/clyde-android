@@ -19,7 +19,7 @@ export function makeTier0Termux(ctx: ToolCtx) {
       async (a) => out(await termux("termux-location", a.provider ? ["-p", a.provider] : [], 30000))
     ),
 
-    tool("clipboard_get", "Read the clipboard.", {}, async () => out(await termux("termux-clipboard-get"))),
+    tool("clipboard_get", "Read the clipboard (may hold passwords/2FA codes). Consequential — confirm() first.", { token: z.string().describe("token from confirm()") }, async () => out(await termux("termux-clipboard-get"))),
     tool("clipboard_set", "Set the clipboard.", { text: z.string() }, async (a) => out(await termux("termux-clipboard-set", [a.text]))),
 
     tool(
@@ -48,7 +48,7 @@ export function makeTier0Termux(ctx: ToolCtx) {
       async (a) => out(await termux("termux-volume", [a.stream, String(a.level)]))
     ),
 
-    tool("download", "Download a URL via the system download manager.", { url: z.string() }, async (a) => out(await termux("termux-download", [a.url]))),
+    tool("download", "Download a URL via the system download manager. Consequential — confirm() first.", { url: z.string(), token: z.string().describe("token from confirm()") }, async (a) => out(await termux("termux-download", [a.url]))),
 
     // ── consequential (privacy / hardware capture) ──
     tool(
@@ -58,7 +58,8 @@ export function makeTier0Termux(ctx: ToolCtx) {
       async (a) => {
         const g = gate(ctx, "mic_record", a);
         if (g) return g;
-        return out(await termux("termux-microphone-record", ["-l", String(a.seconds), "-f", "/sdcard/clyde-rec.m4a"], (a.seconds + 5) * 1000));
+        // Termux-private storage (NOT world-readable /sdcard).
+        return out(await termux("termux-microphone-record", ["-l", String(a.seconds), "-f", "/data/data/com.termux/files/home/.clyde-rec.m4a"], (a.seconds + 5) * 1000));
       }
     ),
     tool(
@@ -68,7 +69,7 @@ export function makeTier0Termux(ctx: ToolCtx) {
       async (a) => {
         const g = gate(ctx, "camera_photo", a);
         if (g) return g;
-        return out(await termux("termux-camera-photo", ["-c", a.camera ?? "0", "/sdcard/clyde-photo.jpg"], 20000));
+        return out(await termux("termux-camera-photo", ["-c", a.camera ?? "0", "/data/data/com.termux/files/home/.clyde-photo.jpg"], 20000));
       }
     ),
     tool(

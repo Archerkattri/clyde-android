@@ -18,13 +18,13 @@ export const image = (b64: string, mime = "image/png"): ToolResult => ({
 });
 
 /**
- * Guard a consequential tool: enforce hard stops, then consume the one-time token.
- * Returns an error ToolResult to short-circuit, or null if the action may proceed.
+ * Defense-in-depth guard used inside handlers: refuse while halted and apply hard stops.
+ * The one-time, action-bound token check is enforced centrally in agent.ts `canUseTool`
+ * (which runs before any tool), so handlers never consume tokens themselves.
  */
 export function gate(ctx: ToolCtx, tool: string, args: Record<string, unknown>): ToolResult | null {
+  if (ctx.safety.isHalted()) return err("Clyde is stopped — resume to continue.");
   const stop = ctx.safety.hardStop(tool, args);
   if (stop) return err(stop);
-  const t = ctx.safety.consumeToken(args.token as string | undefined);
-  if (!t.ok) return err(t.error ?? "confirmation required");
   return null;
 }

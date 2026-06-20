@@ -56,6 +56,7 @@ class AgentOrchestratorService : Service() {
                 key = Prefs.clydeKey,
                 confirmHandler = { summary, details -> overlay.confirmBlocking(summary, details) },
                 overlayStatus = { text, _ -> overlay.status(text) },
+                consumeIntentToken = { token -> overlay.consumeIssuedToken(token) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {

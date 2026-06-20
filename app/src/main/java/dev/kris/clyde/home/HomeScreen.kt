@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
@@ -25,7 +30,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +41,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
+import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
@@ -41,6 +50,7 @@ import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
+import dev.kris.clyde.util.Prefs
 import kotlinx.coroutines.launch
 
 /** Panel 08 — Home / control center. */
@@ -88,6 +98,46 @@ fun HomeScreen(onAsk: () -> Unit) {
         CapabilityRow("Type, install, change settings", if (caps.shizuku) "on" else "off", live = caps.shizuku, on = caps.shizuku)
         CapabilityRow("Unrestricted (root)", if (caps.root) "on" else "off", live = caps.root, on = caps.root)
 
+        Spacer(Modifier.height(16.dp))
+        Eyebrow("brain key")
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+                .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Pair the brain", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Ink)
+                Text(Prefs.clydeKey.take(10) + "…", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+            }
+            Text(
+                "Copy",
+                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
+                modifier = Modifier.clickable {
+                    val clip = ctx.getSystemService(ClipboardManager::class.java)
+                    clip?.setPrimaryClip(ClipData.newPlainText("CLYDE_KEY", Prefs.clydeKey))
+                }.padding(8.dp),
+            )
+            Text(
+                "Sync",
+                fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
+                modifier = Modifier.clickable {
+                    val k = Prefs.clydeKey
+                    TermuxRunCommand.runInTermux(
+                        ctx,
+                        "mkdir -p ~/clyde/brain; touch ~/clyde/brain/.env; " +
+                            "if grep -q '^CLYDE_KEY=' ~/clyde/brain/.env; then " +
+                            "sed -i \"s/^CLYDE_KEY=.*/CLYDE_KEY=$k/\" ~/clyde/brain/.env; " +
+                            "else echo \"CLYDE_KEY=$k\" >> ~/clyde/brain/.env; fi",
+                        background = true,
+                    )
+                }.padding(8.dp),
+            )
+        }
+
         Spacer(Modifier.weight(1f))
         PrimaryButton("Ask Clyde", onClick = onAsk)
         Spacer(Modifier.height(12.dp))
@@ -131,14 +181,26 @@ private fun CapabilityRow(name: String, status: String, live: Boolean, on: Boole
             .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(8.dp)
-                .background(
-                    if (live) ClydeColor.Blue else if (on) ClydeColor.BlueDeep else ClydeColor.Line2,
-                    CircleShape,
-                ),
-        )
+        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+            if (live) {
+                val t = rememberInfiniteTransition(label = "cap")
+                val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1500), RepeatMode.Restart), label = "capP")
+                Box(
+                    Modifier
+                        .size(16.dp)
+                        .graphicsLayer { alpha = 0.4f * (1f - p); scaleX = 0.5f + p; scaleY = 0.5f + p }
+                        .background(ClydeColor.Blue, CircleShape),
+                )
+            }
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .background(
+                        if (live) ClydeColor.Blue else if (on) ClydeColor.BlueDeep else ClydeColor.Line2,
+                        CircleShape,
+                    ),
+            )
+        }
         Spacer(Modifier.size(12.dp))
         Text(
             name,

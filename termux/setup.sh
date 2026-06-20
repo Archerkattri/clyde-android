@@ -23,9 +23,10 @@ Next steps:
   1) claude            # choose "Claude Pro/Max subscription", finish OAuth in browser
   2) claude /status    # must say subscription, NOT API
   3) unset ANTHROPIC_API_KEY   # the brain refuses to start if this is set
-  4) cd ~/clyde/brain && npm install
-     cp .env.example .env
-     # set CLYDE_KEY in .env to EXACTLY match the app (Clyde → Settings shows it)
+  4) cd ~/clyde/brain && npm install && cp .env.example .env
+     # Set CLYDE_KEY to match the app: in Clyde → Home → "brain key", tap "Sync"
+     # (writes it into ~/clyde/brain/.env), or tap "Copy" and paste it into .env.
+     # The brain REFUSES to start without a key (no unauthenticated mode).
   5) npm run start     # brain on 127.0.0.1:8765
   6) Boot autostart:   cp ../termux/boot/start-brain.sh ~/.termux/boot/ && chmod +x ~/.termux/boot/start-brain.sh
 NEXT

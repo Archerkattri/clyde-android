@@ -40,9 +40,11 @@ object DeviceIntents {
         }
         if (!query.isNullOrBlank()) {
             val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            val match = pm.queryIntentActivities(main, 0).firstOrNull {
-                it.loadLabel(pm).toString().contains(query, ignoreCase = true)
-            }
+            val acts = pm.queryIntentActivities(main, 0)
+            // prefer exact label, then prefix, then substring — avoids launching an impostor
+            val match = acts.firstOrNull { it.loadLabel(pm).toString().equals(query, ignoreCase = true) }
+                ?: acts.firstOrNull { it.loadLabel(pm).toString().startsWith(query, ignoreCase = true) }
+                ?: acts.firstOrNull { it.loadLabel(pm).toString().contains(query, ignoreCase = true) }
             match?.activityInfo?.packageName?.let { p ->
                 pm.getLaunchIntentForPackage(p)?.let { return start(ctx, it) }
             }

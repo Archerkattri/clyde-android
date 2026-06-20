@@ -68,7 +68,8 @@ class PhoneControlAccessibilityService : AccessibilityService() {
                     JSONObject()
                         .put("nodeId", id)
                         .put("role", n.className?.toString() ?: "")
-                        .put("text", n.text?.toString() ?: "")
+                        // never serialize password-field contents to the model
+                        .put("text", if (n.isPassword) "[masked]" else (n.text?.toString() ?: ""))
                         .put("desc", n.contentDescription?.toString() ?: "")
                         .put("bounds", JSONArray(listOf(b.left, b.top, b.right, b.bottom)))
                         .put("clickable", n.isClickable)

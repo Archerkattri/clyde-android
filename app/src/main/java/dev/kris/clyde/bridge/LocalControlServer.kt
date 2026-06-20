@@ -12,6 +12,7 @@ import fi.iki.elonen.NanoHTTPD.Method
 import fi.iki.elonen.NanoHTTPD.Response
 import fi.iki.elonen.NanoHTTPD.newFixedLengthResponse
 import org.json.JSONObject
+import java.security.MessageDigest
 
 /** The app's action API on 127.0.0.1:8766 — the brain calls these. Loopback + X-Clyde-Key. */
 class LocalControlServer(
@@ -20,15 +21,19 @@ class LocalControlServer(
     private val key: String,
     private val confirmHandler: (summary: String, details: String?) -> Pair<Boolean, String?>,
     private val overlayStatus: (text: String, state: String?) -> Unit,
+    private val consumeIntentToken: (token: String) -> Boolean,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
         const val PORT = 8766
+        // Intents the app independently gates with a user-approved, one-time token —
+        // never trusting the brain to self-gate (defense-in-depth).
+        private val CONSEQUENTIAL_INTENTS = setOf("send_sms", "start_call", "add_calendar_event")
     }
 
     override fun serve(session: IHTTPSession): Response {
         return try {
-            if (key.isNotEmpty() && session.headers["x-clyde-key"] != key) {
+            if (!authorized(session)) {
                 return json(err("bad or missing X-Clyde-Key"), Response.Status.UNAUTHORIZED)
             }
             val body = parseJson(session)
@@ -52,7 +57,18 @@ class LocalControlServer(
                 }
                 uri.startsWith("/intent/") -> {
                     val name = uri.removePrefix("/intent/")
-                    if (DeviceIntents.fire(ctx, name, body)) ok(JSONObject().put("fired", name)) else err("$name failed")
+                    if (name in CONSEQUENTIAL_INTENTS) {
+                        val token = body.optString("token")
+                        when {
+                            token.isBlank() || !consumeIntentToken(token) -> err("confirmation required: no valid token for $name")
+                            DeviceIntents.fire(ctx, name, body) -> ok(JSONObject().put("fired", name))
+                            else -> err("$name failed")
+                        }
+                    } else if (DeviceIntents.fire(ctx, name, body)) {
+                        ok(JSONObject().put("fired", name))
+                    } else {
+                        err("$name failed")
+                    }
                 }
                 uri == "/speak" -> { voice.speak(body.optString("text")); ok(JSONObject()) }
                 uri == "/overlay/status" -> {
@@ -69,9 +85,15 @@ class LocalControlServer(
                 else -> err("not found: $uri")
             }
             json(result)
-        } catch (e: Exception) {
-            json(err(e.message ?: "error"))
+        } catch (_: Exception) {
+            json(err("internal error")) // don't echo internals to the caller
         }
+    }
+
+    private fun authorized(session: IHTTPSession): Boolean {
+        if (key.isEmpty()) return false // the app always generates a key; empty means misconfig → reject
+        val provided = session.headers["x-clyde-key"] ?: return false
+        return MessageDigest.isEqual(provided.toByteArray(), key.toByteArray())
     }
 
     private fun caps(): JSONObject {
