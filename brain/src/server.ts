@@ -9,8 +9,11 @@ import type { AgentEvent } from "./types";
 assertSubscriptionAuth();
 assertServerSafe();
 
+// Don't let a rejected interrupt()/stray promise crash the brain.
+process.on("unhandledRejection", (e) => console.error("[clyde] unhandledRejection:", e));
+
 const MAX_BODY = 256 * 1024;
-const MAX_INFLIGHT = 2;
+const MAX_INFLIGHT = 1; // one supervised turn at a time (also prevents cross-turn halt races)
 let inFlight = 0;
 
 function safeEqual(a: string, b: string): boolean {

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
+import android.hardware.HardwareBuffer
 import android.os.Bundle
 import android.util.Base64
 import android.view.Display
@@ -28,7 +29,8 @@ class PhoneControlAccessibilityService : AccessibilityService() {
         var instance: PhoneControlAccessibilityService? = null
     }
 
-    private val nodeMap = HashMap<String, AccessibilityNodeInfo>()
+    // accessed from NanoHTTPD worker threads (dump writes, tap/type read) → concurrent-safe
+    private val nodeMap = java.util.concurrent.ConcurrentHashMap<String, AccessibilityNodeInfo>()
 
     override fun onServiceConnected() {
         instance = this
@@ -140,8 +142,9 @@ class PhoneControlAccessibilityService : AccessibilityService() {
         val exec = Executors.newSingleThreadExecutor()
         takeScreenshot(Display.DEFAULT_DISPLAY, exec, object : TakeScreenshotCallback {
             override fun onSuccess(screenshot: ScreenshotResult) {
+                var hb: HardwareBuffer? = null
                 try {
-                    val hb = screenshot.hardwareBuffer
+                    hb = screenshot.hardwareBuffer
                     val bmp = Bitmap.wrapHardwareBuffer(hb, screenshot.colorSpace)
                     if (bmp != null) {
                         val soft = bmp.copy(Bitmap.Config.ARGB_8888, false)
@@ -150,9 +153,9 @@ class PhoneControlAccessibilityService : AccessibilityService() {
                         result = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
                         soft.recycle()
                     }
-                    hb.close()
                 } catch (_: Exception) {
                 } finally {
+                    hb?.close() // release the native buffer even if encode throws
                     latch.countDown()
                 }
             }

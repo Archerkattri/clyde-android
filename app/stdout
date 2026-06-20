@@ -1,4 +1,4 @@
-C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\service\AgentOrchestratorService.kt:110: Warning: Field requires API level 34 (current min is 31): android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_SPECIAL_USE [InlinedApi]
+C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\service\AgentOrchestratorService.kt:118: Warning: Field requires API level 34 (current min is 31): android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_SPECIAL_USE [InlinedApi]
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\setup\SetupScreen.kt:49: Warning: Field requires API level 33 (current min is 31): android.Manifest.permission#POST_NOTIFICATIONS [InlinedApi]
@@ -75,16 +75,19 @@ C:\Users\krish\Documents\claudeandapp\app\build.gradle.kts:93: Warning: A newer 
    However, you may simply not be aware that a more recent version is
    available, and that is what this lint check helps find.
 
-C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\service\AgentOrchestratorService.kt:98: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
+C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\service\AgentOrchestratorService.kt:106: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\assist\AssistEntryActivity.kt:15: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\home\HomeScreen.kt:175: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\MainActivity.kt:66: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\overlay\OverlayController.kt:172: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
+C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\overlay\OverlayController.kt:181: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 C:\Users\krish\Documents\claudeandapp\app\src\main\java\dev\kris\clyde\bridge\TermuxRunCommand.kt:29: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
@@ -137,4 +140,4 @@ C:\Users\krish\Documents\claudeandapp\app\src\main\res\values\colors.xml:4: Warn
    lint.unused-resources.exclude-tests =true.
    ,
 
-0 errors, 19 warnings
+0 errors, 20 warnings

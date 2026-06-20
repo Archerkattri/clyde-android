@@ -87,15 +87,20 @@ object DeviceIntents {
             if (!targetPackage.isNullOrBlank()) setPackage(targetPackage)
         })
 
-    private fun startCall(ctx: Context, number: String): Boolean =
-        start(ctx, Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")))
+    private fun startCall(ctx: Context, number: String): Boolean {
+        val clean = number.filter { it.isDigit() || it in "+*#" }
+        if (clean.isBlank()) return false // no silent "success" on an empty/contact-only call
+        return start(ctx, Intent(Intent.ACTION_CALL, Uri.parse("tel:$clean")))
+    }
 
-    private fun sendSms(ctx: Context, to: String, body: String): Boolean = try {
-        val sms = ctx.getSystemService(SmsManager::class.java)
-        sms.sendTextMessage(to, null, body, null, null)
-        true
-    } catch (_: Exception) {
-        false
+    private fun sendSms(ctx: Context, to: String, body: String): Boolean {
+        if (to.isBlank() || body.isBlank()) return false
+        return try {
+            ctx.getSystemService(SmsManager::class.java).sendTextMessage(to, null, body, null, null)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun addCalendarEvent(ctx: Context, body: JSONObject): Boolean = try {

@@ -70,11 +70,13 @@ export class AppClient {
   overlayStatus(b: { text: string; state?: string }) {
     return this.req("POST", "/overlay/status", b);
   }
-  gemini(b: { prompt: string; want: "image" | "text" | "action" }) {
-    return this.req<{ text?: string; uri?: string }>("POST", "/gemini/delegate", b, 120000);
+  /** Fire-and-forget hand-off to the Gemini app (no generated result is returned). */
+  gemini(b: { prompt: string; want: "image" | "text" | "action"; token: string }) {
+    return this.req<{ delegated: boolean }>("POST", "/gemini/delegate", b, 20000);
   }
-  /** Blocks until the user approves/denies in the app. Returns a one-time token on approval. */
-  confirm(b: { summary: string; details?: string }) {
+  /** Blocks until the user approves/denies in the app. Returns a one-time token on approval.
+   *  `action` lets the app bind the issued token to this tool (defense-in-depth). */
+  confirm(b: { summary: string; details?: string; action: string }) {
     return this.req<ConfirmResult>("POST", "/confirm", b, 120000);
   }
 }

@@ -34,7 +34,6 @@ interface TokenRecord {
 
 export class Safety {
   private readonly tokens = new Map<string, TokenRecord>();
-  private halted = false;
   private readonly ownPackage = "dev.kris.clyde";
   private readonly ttlMs = 75_000; // ~ the app's confirm poll window + margin
 
@@ -45,13 +44,6 @@ export class Safety {
     return !SAFE.has(tool);
   }
 
-  setHalted(v: boolean): void {
-    this.halted = v;
-  }
-  isHalted(): boolean {
-    return this.halted;
-  }
-
   /** Record an app-issued token, BOUND to the exact tool + args it was approved for. */
   registerToken(token: string, tool: string, hash: string): void {
     this.tokens.set(token, { tool, hash, exp: Date.now() + this.ttlMs, used: false });
@@ -59,7 +51,6 @@ export class Safety {
 
   /** One-time consume, bound: the token must match this tool AND these args. */
   consumeToken(token: string | undefined, tool: string, hash: string): { ok: boolean; error?: string } {
-    if (this.halted) return { ok: false, error: "Clyde is stopped — the user must resume before any action." };
     if (!token) return { ok: false, error: "missing confirmation token — call confirm({action, params}) first and pass its token." };
     const rec = this.tokens.get(token);
     if (!rec) return { ok: false, error: "unknown token — tokens only come from confirm(); never invent one." };
@@ -82,12 +73,12 @@ export class Safety {
   /** Hard stops that apply even with a valid token. Returns a reason if blocked. */
   hardStop(tool: string, args: Record<string, unknown>): string | null {
     const blob = JSON.stringify(args ?? {}).toLowerCase();
+    // Explicit payment-ACTION phrases only (not bare "pay"/"payment") to avoid false
+    // positives like "Pay Kim" contacts or a "Payment history" menu.
     const moneyRe =
-      /\b(payment|purchase|checkout|venmo|paypal|wire transfer|send money|transfer funds|\bpay\b|crypto|trading|place (an )?order|buy now|pay now|confirm payment)\b/;
-    // covers shell AND UI-driven payments (tapping/typing "Confirm payment", sharing, opening pay links)
-    const moneyTools = new Set([
-      "shell", "su_shell", "send_sms", "type_text", "input_text", "tap", "share_text", "open_url", "delegate_to_gemini",
-    ]);
+      /\b(confirm payment|send money|transfer (funds|money)|place (an )?order|pay now|wire transfer|make (a )?payment|buy now|checkout now)\b/;
+    // Scope to transaction-EXECUTING / egress tools, never perception/navigation.
+    const moneyTools = new Set(["shell", "su_shell", "open_url", "share_text", "delegate_to_gemini"]);
     if (moneyTools.has(tool) && moneyRe.test(blob)) {
       return "blocked: this looks like a payment or financial action. Clyde never moves money — please do it yourself.";
     }

@@ -32,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
+import android.os.Build
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +45,7 @@ import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
+import dev.kris.clyde.service.AgentOrchestratorService
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeLogo
@@ -165,7 +168,13 @@ fun HomeScreen(onAsk: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp))
-                .clickable { scope.launch { BrainClient.kill() } }
+                .clickable {
+                    scope.launch { BrainClient.kill() }
+                    val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_KILL)
+                    runCatching {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+                    }
+                }
                 .padding(vertical = 13.dp),
             contentAlignment = Alignment.Center,
         ) { Text("Stop Clyde · revoke tokens", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Danger) }

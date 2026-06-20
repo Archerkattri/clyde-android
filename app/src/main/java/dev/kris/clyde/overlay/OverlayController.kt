@@ -97,14 +97,18 @@ class OverlayController(private val appCtx: Context) :
     private var view: ComposeView? = null
     private val ui = mutableStateOf(OverlayUi())
     private val confirmResult = SynchronousQueue<Pair<Boolean, String?>>()
+    private val confirmPending = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var pendingAction: String = ""
+
+    private data class IssuedToken(val action: String, val exp: Long)
     // tokens the user actually approved — the app validates intents against THIS, not the brain.
-    private val issuedTokens = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val issuedTokens = java.util.concurrent.ConcurrentHashMap<String, IssuedToken>()
     private val tokenTtlMs = 75_000L
 
-    /** Single-use, TTL-bounded consume of an app-issued confirm token. */
-    fun consumeIssuedToken(token: String): Boolean {
-        val exp = issuedTokens.remove(token) ?: return false
-        return System.currentTimeMillis() <= exp
+    /** Single-use, action-bound, TTL-bounded consume of an app-issued confirm token. */
+    fun consumeIssuedToken(token: String, action: String): Boolean {
+        val t = issuedTokens.remove(token) ?: return false
+        return t.action == action && System.currentTimeMillis() <= t.exp
     }
 
     fun clearIssuedTokens() = issuedTokens.clear()
@@ -125,8 +129,11 @@ class OverlayController(private val appCtx: Context) :
     fun answer(text: String) = onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", clawd = ClawdState.Success); attach() }
     fun hide() = onMain { detach() }
 
-    /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies. */
-    fun confirmBlocking(summary: String, details: String?): Pair<Boolean, String?> {
+    /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies.
+     *  Serialized: a second concurrent confirm is denied so a token never flows to the wrong waiter. */
+    fun confirmBlocking(summary: String, details: String?, action: String): Pair<Boolean, String?> {
+        if (!confirmPending.compareAndSet(false, true)) return Pair(false, null)
+        pendingAction = action
         onMain {
             ui.value = ui.value.copy(mode = OverlayMode.Confirm, confirmSummary = summary, confirmDetails = details, clawd = ClawdState.Error)
             attach()
@@ -135,12 +142,14 @@ class OverlayController(private val appCtx: Context) :
             confirmResult.poll(90, TimeUnit.SECONDS) ?: Pair(false, null)
         } catch (_: InterruptedException) {
             Pair(false, null)
+        } finally {
+            confirmPending.set(false)
         }
     }
 
     private fun resolveConfirm(approved: Boolean) {
         val token = if (approved) randomToken() else null
-        if (approved && token != null) issuedTokens[token] = System.currentTimeMillis() + tokenTtlMs
+        if (approved && token != null) issuedTokens[token] = IssuedToken(pendingAction, System.currentTimeMillis() + tokenTtlMs)
         confirmResult.offer(Pair(approved, token))
         onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }
     }

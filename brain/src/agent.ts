@@ -18,20 +18,18 @@ const app = new AppClient();
 const safety = new Safety();
 const sessionMap = new Map<string, string>(); // appSessionId -> SDK session_id
 let activeQuery: ReturnType<typeof query> | null = null;
+let haltCurrent: (() => void) | null = null; // halts the CURRENT turn only (per-turn, not global)
 
 export function getSafety(): Safety {
   return safety;
 }
 
-/** Kill switch: halt, drop tokens, and interrupt the in-flight turn so ungated UI tools stop. */
+/** Kill switch: drop tokens, halt the in-flight turn, and interrupt it (best-effort). */
 export function haltActiveTurn(): void {
-  safety.setHalted(true);
   safety.invalidateAll();
-  try {
-    activeQuery?.interrupt();
-  } catch {
-    /* ignore */
-  }
+  haltCurrent?.();
+  // interrupt() may reject if the control transport is closed (string-prompt turns) — swallow it.
+  activeQuery?.interrupt()?.catch(() => {});
 }
 
 export interface RunArgs {
@@ -41,12 +39,16 @@ export interface RunArgs {
 
 export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
   emit({ type: "status", text: "thinking…" });
-  safety.setHalted(false); // a fresh user request resumes after any prior kill
 
   const caps = await probeCapabilities(app);
   const ctx: ToolCtx = { app, safety, caps, emit, rish, su };
   const server = buildClydeServer(ctx);
   const prior = sessionMap.get(args.sessionId);
+
+  // Per-turn halt: a kill flips THIS turn's flag; a later turn has its own fresh flag,
+  // so resuming never un-kills a still-running prior turn.
+  let halted = false;
+  haltCurrent = () => { halted = true; };
 
   let finalText = "";
   const q = query({
@@ -63,7 +65,7 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
       canUseTool: async (toolName, input) => {
         const t = toolName.replace(/^mcp__clyde__/, "");
         const a = (input ?? {}) as Record<string, unknown>;
-        if (safety.isHalted()) return { behavior: "deny", message: "Clyde is stopped." };
+        if (halted) return { behavior: "deny", message: "Clyde is stopped." };
         const stop = safety.hardStop(t, a);
         if (stop) return { behavior: "deny", message: stop };
         if (safety.isConsequential(t)) {
@@ -112,6 +114,7 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
     return;
   } finally {
     activeQuery = null;
+    haltCurrent = null;
   }
 
   emit({ type: "final", text: finalText || "Done." });

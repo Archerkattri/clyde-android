@@ -28,6 +28,7 @@ class AgentOrchestratorService : Service() {
 
     companion object {
         const val ACTION_ASSIST = "dev.kris.clyde.ASSIST"
+        const val ACTION_KILL = "dev.kris.clyde.KILL"
         private const val CHANNEL = "clyde_orchestrator"
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
@@ -54,9 +55,9 @@ class AgentOrchestratorService : Service() {
                 ctx = applicationContext,
                 voice = voice,
                 key = Prefs.clydeKey,
-                confirmHandler = { summary, details -> overlay.confirmBlocking(summary, details) },
+                confirmHandler = { summary, details, action -> overlay.confirmBlocking(summary, details, action) },
                 overlayStatus = { text, _ -> overlay.status(text) },
-                consumeIntentToken = { token -> overlay.consumeIssuedToken(token) },
+                consumeIntentToken = { token, action -> overlay.consumeIssuedToken(token, action) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -65,7 +66,14 @@ class AgentOrchestratorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_ASSIST) beginAssist()
+        when (intent?.action) {
+            ACTION_ASSIST -> beginAssist()
+            ACTION_KILL -> {
+                overlay.clearIssuedTokens()
+                overlay.hide()
+                voice.stopListening()
+            }
+        }
         return START_STICKY
     }
 

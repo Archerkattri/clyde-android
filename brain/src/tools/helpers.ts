@@ -23,7 +23,6 @@ export const image = (b64: string, mime = "image/png"): ToolResult => ({
  * (which runs before any tool), so handlers never consume tokens themselves.
  */
 export function gate(ctx: ToolCtx, tool: string, args: Record<string, unknown>): ToolResult | null {
-  if (ctx.safety.isHalted()) return err("Clyde is stopped — resume to continue.");
   const stop = ctx.safety.hardStop(tool, args);
   if (stop) return err(stop);
   return null;

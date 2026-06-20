@@ -19,9 +19,9 @@ class LocalControlServer(
     private val ctx: Context,
     private val voice: VoiceIO,
     private val key: String,
-    private val confirmHandler: (summary: String, details: String?) -> Pair<Boolean, String?>,
+    private val confirmHandler: (summary: String, details: String?, action: String) -> Pair<Boolean, String?>,
     private val overlayStatus: (text: String, state: String?) -> Unit,
-    private val consumeIntentToken: (token: String) -> Boolean,
+    private val consumeIntentToken: (token: String, action: String) -> Boolean,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
@@ -60,7 +60,7 @@ class LocalControlServer(
                     if (name in CONSEQUENTIAL_INTENTS) {
                         val token = body.optString("token")
                         when {
-                            token.isBlank() || !consumeIntentToken(token) -> err("confirmation required: no valid token for $name")
+                            token.isBlank() || !consumeIntentToken(token, name) -> err("confirmation required: no valid token for $name")
                             DeviceIntents.fire(ctx, name, body) -> ok(JSONObject().put("fired", name))
                             else -> err("$name failed")
                         }
@@ -75,11 +75,20 @@ class LocalControlServer(
                     overlayStatus(body.optString("text"), body.optString("state").ifBlank { null }); ok(JSONObject())
                 }
                 uri == "/confirm" -> {
-                    val (approved, token) = confirmHandler(body.optString("summary"), body.optString("details").ifBlank { null })
+                    val (approved, token) = confirmHandler(
+                        body.optString("summary"),
+                        body.optString("details").ifBlank { null },
+                        body.optString("action"),
+                    )
                     ok(JSONObject().put("approved", approved).also { if (token != null) it.put("token", token) })
                 }
                 uri == "/gemini/delegate" -> {
-                    if (GeminiRouter.delegate(ctx, body.optString("prompt"))) ok(JSONObject().put("delegated", true)) else err("gemini failed")
+                    val token = body.optString("token")
+                    when {
+                        token.isBlank() || !consumeIntentToken(token, "delegate_to_gemini") -> err("confirmation required: no valid token for gemini")
+                        GeminiRouter.delegate(ctx, body.optString("prompt")) -> ok(JSONObject().put("delegated", true))
+                        else -> err("gemini failed")
+                    }
                 }
                 uri == "/ping" -> ok(JSONObject().put("pong", true))
                 else -> err("not found: $uri")
