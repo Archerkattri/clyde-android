@@ -51,7 +51,8 @@ Built with the **frontend-design** skill. Distinctive, authentic-Claude, anti-AI
   + `overlay/ClawdView` (mascot), `overlay/OverlayController` (summon/confirm glass).
 
 ## Conventions
-- Android: Kotlin, **min SDK 31 / target 35**, single `app` module, Jetpack Compose. Coroutines for IO. No secrets in code.
+- Android: Kotlin, **min SDK 31 / target 36 / compile 36**, single `app` module, Jetpack Compose. Coroutines for IO. No secrets in code.
+- Toolchain (June 2026, "everything latest"): **AGP 9.2.0, Gradle 9.6.0, Kotlin + Compose-compiler 2.4.0, JDK 21** (build with Android Studio's JBR 21). AGP-9 compat: `android.newDsl=false` + `android.builtInKotlin=false` keep the standalone Kotlin plugin (removed in AGP 10 → migrate to built-in Kotlin then). compileSdk stays **36** (stable Android 16); API 37 is preview, so the Compose-1.11/lifecycle-2.11 (37-only) releases are intentionally skipped — using Compose BOM 2026.03.00, lifecycle 2.10.0, activity 1.13.0, core-ktx 1.17.0, coroutines 1.11.0, **Coil 3.5.0** (coil3 coordinates). Brain: TypeScript 6.0.3, zod 4.4.3, tsx 4.22.4, @types/node 20.x (Termux Node 20), claude-agent-sdk 0.3.183.
 - Brain: TypeScript strict, small pure tool handlers, all device effects behind `appClient` / `rish` / `su` wrappers.
 - Prefer the lowest-friction correct tool: clean intent > accessibility > input-injection > root.
 
