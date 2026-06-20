@@ -3,6 +3,7 @@ package dev.kris.clyde.caps
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -45,6 +46,8 @@ object CapabilityProbe {
             romName = rom,
             perms = mapOf(
                 "mic" to granted(ctx, Manifest.permission.RECORD_AUDIO),
+                // POST_NOTIFICATIONS is only a runtime grant on API 33+; treat older as granted.
+                "notifications" to (Build.VERSION.SDK_INT < 33 || granted(ctx, Manifest.permission.POST_NOTIFICATIONS)),
                 "call" to granted(ctx, Manifest.permission.CALL_PHONE),
                 "sms" to granted(ctx, Manifest.permission.SEND_SMS),
                 "location" to granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION),

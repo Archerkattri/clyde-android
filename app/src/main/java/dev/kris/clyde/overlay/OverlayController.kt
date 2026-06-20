@@ -68,6 +68,7 @@ import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.Serif
 import dev.kris.clyde.ui.pressable
 import dev.kris.clyde.ui.reduceMotion
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -106,10 +107,25 @@ class OverlayController(private val appCtx: Context) :
     @Volatile private var pendingAction: String = ""
     @Volatile private var pendingParams: JSONObject = JSONObject()
 
-    private data class IssuedToken(val action: String, val params: JSONObject, val exp: Long)
+    // Bind to a hash of ALL approved (non-token) args — mirrors the brain's argsHash so the app's
+    // independent check is exactly as strong: an empty/partial approval can't authorize a populated
+    // fire, and extra/changed/missing body keys are all rejected (key-order independent).
+    private data class IssuedToken(val action: String, val argsHash: String, val exp: Long)
     // tokens the user actually approved — the app validates intents against THIS, not the brain.
     private val issuedTokens = java.util.concurrent.ConcurrentHashMap<String, IssuedToken>()
     private val tokenTtlMs = 75_000L
+
+    /** Stable hash of a body's args, EXCLUDING "token" — sorted keys so order can't matter. */
+    private fun argsHash(obj: JSONObject): String {
+        val keys = ArrayList<String>()
+        val it = obj.keys()
+        while (it.hasNext()) { val k = it.next(); if (k != "token") keys.add(k) }
+        keys.sort()
+        val sb = StringBuilder()
+        // JSONObject.quote self-delimits each pair, so no separator can collide with arg content
+        for (k in keys) sb.append(JSONObject.quote(k)).append(':').append(JSONObject.quote(obj.opt(k)?.toString() ?: "null")).append(',')
+        return MessageDigest.getInstance("SHA-256").digest(sb.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+    }
 
     // After an answer, let the success crab play once then settle to idle (don't hop forever).
     private val settle = Runnable {
@@ -122,12 +138,7 @@ class OverlayController(private val appCtx: Context) :
     fun validateIssuedToken(token: String, action: String, body: JSONObject): Boolean {
         val t = issuedTokens[token] ?: return false
         if (t.action != action || System.currentTimeMillis() > t.exp) return false
-        val keys = t.params.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
-            if (body.optString(k) != t.params.optString(k)) return false
-        }
-        return true
+        return t.argsHash == argsHash(body) // full args must match — not just the approved subset
     }
 
     /** Burn a token after a SUCCESSFUL action (enforces single-use without burning failed attempts). */
@@ -171,14 +182,21 @@ class OverlayController(private val appCtx: Context) :
             attach()
         }
         return try {
-            confirmResult.poll(90, TimeUnit.SECONDS) ?: run {
-                onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon) } // clear stale confirm UI on timeout
-                Pair(false, null)
+            val r = confirmResult.poll(90, TimeUnit.SECONDS)
+            when {
+                r != null -> r // a tap/cancel delivered a result (it already released confirmPending)
+                // poll timed out: claim the gate. If we win, nobody resolved → genuine timeout.
+                confirmPending.compareAndSet(true, false) -> {
+                    onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon) } // clear stale confirm UI
+                    Pair(false, null)
+                }
+                // we lost the CAS: a resolve/cancel committed just as we timed out — take ITS result
+                // (so an approval that minted a token is reported to the brain, never dropped).
+                else -> confirmResult.poll(2, TimeUnit.SECONDS) ?: Pair(false, null)
             }
         } catch (_: InterruptedException) {
+            confirmPending.compareAndSet(true, false)
             Pair(false, null)
-        } finally {
-            confirmPending.set(false)
         }
     }
 
@@ -194,7 +212,7 @@ class OverlayController(private val appCtx: Context) :
         if (!confirmPending.compareAndSet(true, false)) return // first tap only — ignore double/late taps
         val token = if (approved) randomToken() else null
         if (approved && token != null) {
-            issuedTokens[token] = IssuedToken(pendingAction, pendingParams, System.currentTimeMillis() + tokenTtlMs)
+            issuedTokens[token] = IssuedToken(pendingAction, argsHash(pendingParams), System.currentTimeMillis() + tokenTtlMs)
         }
         confirmResult.offer(Pair(approved, token))
         onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }

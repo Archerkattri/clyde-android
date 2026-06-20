@@ -30,7 +30,7 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
 
     tool("input_tap", "Tap screen coordinates via ADB input.", { x: z.number().int(), y: z.number().int() }, async (a) => run(`input tap ${a.x} ${a.y}`)),
     tool("input_text", "Type text via ADB input.", { text: z.string() }, async (a) => run(`input text ${sq(a.text)}`)),
-    tool("input_key", "Send a key event via ADB input.", { keycode: z.union([z.number().int(), z.string()]) }, async (a) => run(`input keyevent ${a.keycode}`)),
+    tool("input_key", "Send a key event via ADB input (numeric code or KEYCODE_* name).", { keycode: z.union([z.number().int(), z.string().regex(/^[A-Z0-9_]+$/)]) }, async (a) => run(`input keyevent ${a.keycode}`)),
     tool("uiautomator_dump", "Dump the UI hierarchy via uiautomator (when the accessibility tree is awkward).", {}, async () => run("uiautomator dump /sdcard/clyde_dump.xml >/dev/null 2>&1; cat /sdcard/clyde_dump.xml")),
     tool("screencap", "Capture the screen via screencap (returns image for vision).", {}, async () => {
       const r = await ctx.rish("screencap -p | base64 -w 0");
@@ -40,7 +40,7 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
     tool(
       "pm_grant",
       "Grant a runtime permission to a package. Consequential.",
-      { pkg: z.string(), permission: z.string(), token: z.string() },
+      { pkg: z.string().regex(/^[A-Za-z0-9._]+$/), permission: z.string().regex(/^[A-Za-z0-9._]+$/), token: z.string() },
       async (a) => {
         const g = gate(ctx, "pm_grant", a);
         if (g) return g;
@@ -57,12 +57,12 @@ export function makeTier2Shizuku(ctx: ToolCtx) {
         return run(`settings put ${a.namespace} ${sq(a.key)} ${sq(a.value)}`);
       }
     ),
-    tool("app_disable", "Disable an app for the current user. Consequential.", { pkg: z.string(), token: z.string() }, async (a) => {
+    tool("app_disable", "Disable an app for the current user. Consequential.", { pkg: z.string().regex(/^[A-Za-z0-9._]+$/), token: z.string() }, async (a) => {
       const g = gate(ctx, "app_disable", a);
       if (g) return g;
       return run(`pm disable-user --user 0 ${a.pkg}`);
     }),
-    tool("force_stop", "Force-stop an app. Consequential.", { pkg: z.string(), token: z.string() }, async (a) => {
+    tool("force_stop", "Force-stop an app. Consequential.", { pkg: z.string().regex(/^[A-Za-z0-9._]+$/), token: z.string() }, async (a) => {
       const g = gate(ctx, "force_stop", a);
       if (g) return g;
       return run(`am force-stop ${a.pkg}`);

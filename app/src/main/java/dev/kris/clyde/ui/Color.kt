@@ -16,7 +16,7 @@ object ClydeColor {
     val Line = Color(0xFFE8E2D5)
     val Line2 = Color(0xFFD8CFBD)
     val Ink = Color(0xFF141413)
-    val Muted = Color(0xFF73706A)
+    val Muted = Color(0xFF6F6C66) // warm muted gray — nudged from #73706A to clear WCAG AA (4.5:1) on Panel2 too
     val Faint = Color(0xFFA8A296)
 
     // brand

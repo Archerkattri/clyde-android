@@ -50,12 +50,14 @@ import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.SecondaryLink
 import dev.kris.clyde.ui.pressable
 
+// Keep this in sync with CapabilityProbe.perms so the Grants "App permissions" row can read granted.
 private val RUNTIME_PERMS = arrayOf(
     android.Manifest.permission.RECORD_AUDIO,
     android.Manifest.permission.POST_NOTIFICATIONS,
     android.Manifest.permission.CALL_PHONE,
     android.Manifest.permission.SEND_SMS,
     android.Manifest.permission.ACCESS_FINE_LOCATION,
+    android.Manifest.permission.WRITE_CALENDAR,
 )
 
 private enum class SetupStep { Branch, Chooser, Pairing, Grants }
