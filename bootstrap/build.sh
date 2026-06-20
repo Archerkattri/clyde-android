@@ -33,6 +33,7 @@ fi
 if ! grep -q 'CLYDE minimal' scripts/build-bootstraps.sh; then
   awk '/# Handle additional packages\./ && !d { print "\t\tPACKAGES=(\"termux-exec\" \"bash\" \"coreutils\") # CLYDE minimal"; d=1 } { print }' \
     scripts/build-bootstraps.sh > scripts/build-bootstraps.sh.tmp && mv scripts/build-bootstraps.sh.tmp scripts/build-bootstraps.sh
+  chmod +x scripts/build-bootstraps.sh   # the rewrite drops the exec bit; the container execs it
 fi
 
 # 3) Clean only when asked. CLYDE_SKIP_CLEAN=1 reuses already-built package debs for a fast retry
