@@ -35,3 +35,6 @@ design/*.tmp.png
 
 # stray gradle log capture
 app/stdout
+
+# local emulator screenshots
+.preview/
