@@ -3,6 +3,7 @@ package dev.kris.clyde.setup
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +38,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.bridge.TermuxRunCommand
+import dev.kris.clyde.runtime.ClaudeAuth
+import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.service.AgentOrchestratorService
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
@@ -56,6 +60,15 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun BrainSetupScreen(onConnected: () -> Unit, onSkip: () -> Unit) {
+    val ctx = LocalContext.current
+    // Embedded build (runtime bundled in the APK): drive the in-app runtime + sign-in, no Termux.
+    // Otherwise fall back to the external-Termux companion (curl bootstrap).
+    if (EmbeddedRuntime.isBundled(ctx)) EmbeddedBrainSetup(onConnected, onSkip)
+    else TermuxCompanionSetup(onConnected, onSkip)
+}
+
+@Composable
+private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     val ctx = LocalContext.current
     val key = Prefs.clydeKey
     val command = "curl -fsS -H \"X-Clyde-Key: $key\" http://127.0.0.1:8766/bootstrap.sh | bash -s -- $key"
@@ -168,6 +181,106 @@ fun BrainSetupScreen(onConnected: () -> Unit, onSkip: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         PrimaryButton("Continue", onClick = onConnected, enabled = online == true)
         SecondaryLink("Skip for now — set this up later", onClick = onSkip)
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
+    val ctx = LocalContext.current
+    val auth = remember { ClaudeAuth(ctx) }
+    var runtimeReady by remember { mutableStateOf(false) }
+    var online by remember { mutableStateOf<Boolean?>(null) }
+    var signedIn by remember { mutableStateOf(false) }
+    var loginActive by remember { mutableStateOf(false) }
+    var loginStatus by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+
+    // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real state.
+    LaunchedEffect(Unit) {
+        val i = Intent(ctx, AgentOrchestratorService::class.java)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+        }
+        while (true) {
+            runtimeReady = EmbeddedRuntime.isInstalled(ctx)
+            online = BrainClient.healthz()
+            if (auth.isSignedIn()) signedIn = true
+            delay(2000)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ClydeColor.Paper)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 22.dp, vertical = 18.dp),
+    ) {
+        Eyebrow("setup · clyde's brain")
+        Spacer(Modifier.height(6.dp))
+        Text("Setting up Clyde's brain", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 25.sp, letterSpacing = (-0.025).em, color = ClydeColor.Ink)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Clyde's brain runs inside the app — nothing else to install. Sign in once with your Claude plan and you're set.",
+            fontFamily = Body, fontSize = 14.sp, lineHeight = 21.sp, color = ClydeColor.Muted,
+        )
+        Spacer(Modifier.height(18.dp))
+
+        StepCard("1", "Runtime ready", done = runtimeReady) {
+            Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+        }
+        Spacer(Modifier.height(12.dp))
+
+        StepCard("2", "Sign in to Claude", done = signedIn) {
+            if (signedIn) {
+                Text("Signed in on your subscription.", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            } else {
+                Text(
+                    "Opens Claude in your browser to authorize. Clyde never sees your password or token.",
+                    fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
+                )
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    Modifier.background(ClydeColor.Blue, RoundedCornerShape(10.dp))
+                        .pressable(label = "Sign in to Claude") {
+                            if (runtimeReady && !loginActive) {
+                                loginActive = true; loginStatus = "starting…"
+                                auth.start(
+                                    onLine = { loginStatus = it.trim().take(90) },
+                                    onUrl = { url -> runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                                    onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
+                                )
+                            }
+                        }
+                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                ) { Text(if (loginActive) "Signing in…" else "Sign in to Claude", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = OnBlue) }
+                if (loginActive) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = code, onValueChange = { code = it }, singleLine = true,
+                        label = { Text("paste code (only if asked)", fontFamily = Body, fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(9.dp))
+                            .pressable(label = "Submit code") { if (code.isNotBlank()) { auth.submit(code); code = "" } }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) { Text("Submit code", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText) }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        StepCard("3", "Brain online", done = online == true) {
+            Text(if (online == true) "Running on 127.0.0.1:8765." else "Starting the brain…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+        }
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton("Continue", onClick = onConnected, enabled = online == true && signedIn)
+        SecondaryLink("Skip for now — finish later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))
     }
 }
