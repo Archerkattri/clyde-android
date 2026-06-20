@@ -14,6 +14,8 @@ import dev.kris.clyde.R
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.bridge.LocalControlServer
 import dev.kris.clyde.overlay.OverlayController
+import dev.kris.clyde.runtime.BrainRunner
+import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.util.Prefs
 import dev.kris.clyde.voice.VoiceIO
 import fi.iki.elonen.NanoHTTPD
@@ -32,12 +34,14 @@ class AgentOrchestratorService : Service() {
         private const val CHANNEL = "clyde_orchestrator"
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
+        private const val BRAIN_VERSION = "0.1.0" // bump to force the embedded runtime to re-extract
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var voice: VoiceIO
     private lateinit var overlay: OverlayController
     private var server: LocalControlServer? = null
+    private val brain by lazy { BrainRunner(applicationContext) }
     private val sessionId = "app-${System.currentTimeMillis()}"
 
     override fun onCreate() {
@@ -46,6 +50,18 @@ class AgentOrchestratorService : Service() {
         overlay = OverlayController(applicationContext)
         startInForeground()
         startServer()
+        maybeStartEmbeddedBrain()
+    }
+
+    /** If this build bundles the embedded runtime, extract it once and run the brain in-process.
+     *  No-op on builds without a bundled bootstrap — those use an external Termux brain instead. */
+    private fun maybeStartEmbeddedBrain() {
+        if (!EmbeddedRuntime.isBundled(applicationContext)) return
+        scope.launch(Dispatchers.IO) {
+            if (EmbeddedRuntime.ensureInstalled(applicationContext, BRAIN_VERSION)) {
+                brain.start(Prefs.clydeKey)
+            }
+        }
     }
 
     private fun startServer() {
@@ -147,6 +163,7 @@ class AgentOrchestratorService : Service() {
 
     override fun onDestroy() {
         overlay.cancelPendingConfirm() // release a parked confirm worker before closing the server
+        brain.stop()
         server?.stop()
         voice.destroy()
         overlay.destroy()
