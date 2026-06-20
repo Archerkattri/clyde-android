@@ -10,10 +10,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.decode.ImageDecoderDecoder
-import coil.request.ImageRequest
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.gif.AnimatedImageDecoder
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import dev.kris.clyde.ui.reduceMotion
 import kotlin.math.cos
 import kotlin.math.sin
@@ -42,7 +43,7 @@ fun ClawdView(
     val animate = !reduceMotion()
     val loader = remember(animate) {
         val b = ImageLoader.Builder(ctx)
-        if (animate) b.components { add(ImageDecoderDecoder.Factory()) }
+        if (animate) b.components { add(AnimatedImageDecoder.Factory()) }
         b.build()
     }
     val filter = if (state.blue) ColorFilter.colorMatrix(hueRotation(177f)) else null

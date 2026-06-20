@@ -58,31 +58,10 @@ kotlin {
     }
 }
 
-// Pin androidx to the last versions that compile against SDK 35 (newer activity/lifecycle
-// 2.9+/1.12+ require compileSdk 36 + AGP 8.9). Keeps us on the installed toolchain.
-configurations.all {
-    resolutionStrategy {
-        force(
-            "androidx.activity:activity:1.9.3",
-            "androidx.activity:activity-ktx:1.9.3",
-            "androidx.activity:activity-compose:1.9.3",
-            "androidx.lifecycle:lifecycle-common:2.8.7",
-            "androidx.lifecycle:lifecycle-runtime:2.8.7",
-            "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7",
-            "androidx.lifecycle:lifecycle-runtime-compose:2.8.7",
-            "androidx.lifecycle:lifecycle-viewmodel:2.8.7",
-            "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7",
-            "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7",
-            "androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7",
-            "androidx.lifecycle:lifecycle-service:2.8.7",
-            "androidx.lifecycle:lifecycle-process:2.8.7",
-            "androidx.lifecycle:lifecycle-livedata-core:2.8.7",
-        )
-    }
-}
-
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    // Latest Compose/AndroidX that target the stable compileSdk 36 (the 37-only releases —
+    // Compose 1.11.x / lifecycle 2.11.0 — are skipped since API 37 is a preview platform).
+    val composeBom = platform("androidx.compose:compose-bom:2026.03.00")
     implementation(composeBom)
 
     implementation("androidx.compose.ui:ui")
@@ -92,16 +71,16 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-text-google-fonts")
 
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    // Clawd mascot (animated GIF rendering)
-    implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("io.coil-kt:coil-gif:2.7.0")
+    // Clawd mascot (animated GIF rendering) — Coil 3 (coil3 coordinates; local assets only, no network engine)
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-gif:3.5.0")
 
     // Frosted "liquid glass": in-app via Modifier.blur/RenderEffect (API 31+); the summon
     // overlay uses OS cross-window blur (FLAG_BLUR_BEHIND). No external glass lib needed.
