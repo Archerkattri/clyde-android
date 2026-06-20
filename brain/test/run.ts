@@ -1,5 +1,7 @@
-// Tests for the brain's safety-critical logic (action-bound confirm tokens). `npm test`.
+// Tests for the brain's safety-critical logic (action-bound confirm tokens + subscription
+// boot guard). `npm test`.
 import { Safety, argsHash } from "../src/safety";
+import { offSubscriptionReasons } from "../src/config";
 
 let failed = 0;
 function check(name: string, cond: boolean) {
@@ -66,6 +68,39 @@ check("blocks payment via share_text", s.hardStop("share_text", { text: "please 
 s.registerToken("tokK", "send_sms", h);
 s.invalidateAll();
 check("invalidateAll clears tokens", s.consumeToken("tokK", "send_sms", h).ok === false);
+
+// ── subscription-only boot guard: every SDK-honored off-subscription switch is detected ──
+const OFF_KEYS = [
+  "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_IDENTITY_TOKEN",
+  "ANTHROPIC_IDENTITY_TOKEN_FILE", "ANTHROPIC_SERVICE_ACCOUNT_ID", "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_MANTLE",
+  "CLAUDE_CODE_USE_ANTHROPIC_AWS", "ANTHROPIC_BASE_URL", "CLYDE_ALLOW_BASE_URL",
+];
+const clearOff = () => { for (const k of OFF_KEYS) delete process.env[k]; };
+
+clearOff();
+check("clean env → on subscription", offSubscriptionReasons().length === 0);
+clearOff(); process.env.ANTHROPIC_API_KEY = "sk-xxx";
+check("API key → off subscription", offSubscriptionReasons().includes("ANTHROPIC_API_KEY"));
+clearOff(); process.env.CLAUDE_CODE_OAUTH_TOKEN = "tok";
+check("OAuth token → off subscription", offSubscriptionReasons().includes("CLAUDE_CODE_OAUTH_TOKEN"));
+clearOff(); process.env.ANTHROPIC_SERVICE_ACCOUNT_ID = "svc";
+check("service account → off subscription", offSubscriptionReasons().includes("ANTHROPIC_SERVICE_ACCOUNT_ID"));
+clearOff(); process.env.CLAUDE_CODE_USE_BEDROCK = "1";
+check("Bedrock=1 → off subscription", offSubscriptionReasons().includes("CLAUDE_CODE_USE_BEDROCK"));
+clearOff(); process.env.CLAUDE_CODE_USE_VERTEX = "true";
+check("Vertex=true → off subscription", offSubscriptionReasons().includes("CLAUDE_CODE_USE_VERTEX"));
+clearOff(); process.env.CLAUDE_CODE_USE_BEDROCK = "0";
+check("Bedrock=0 → NOT off subscription", offSubscriptionReasons().length === 0);
+clearOff(); process.env.CLAUDE_CODE_USE_BEDROCK = "false";
+check("Bedrock=false → NOT off subscription", offSubscriptionReasons().length === 0);
+clearOff(); process.env.ANTHROPIC_BASE_URL = "http://localhost:9000";
+check("base URL → off subscription", offSubscriptionReasons().includes("ANTHROPIC_BASE_URL"));
+clearOff(); process.env.ANTHROPIC_BASE_URL = "http://localhost:9000"; process.env.CLYDE_ALLOW_BASE_URL = "1";
+check("base URL with explicit opt-in → NOT off subscription", offSubscriptionReasons().length === 0);
+clearOff(); process.env.ANTHROPIC_API_KEY = "   ";
+check("whitespace-only cred treated as unset", offSubscriptionReasons().length === 0);
+clearOff();
 
 if (failed > 0) {
   console.error(`\n${failed} test(s) FAILED`);
