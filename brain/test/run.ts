@@ -44,6 +44,24 @@ check("blocks self pm_grant", s.hardStop("pm_grant", { pkg: "dev.kris.clyde", pe
 check("self pm_grant w/ userAsked STILL blocked", s.hardStop("pm_grant", { pkg: "dev.kris.clyde", permission: "X", userAsked: true }) !== null);
 check("allows normal send_sms", s.hardStop("send_sms", { to: "mom", body: "hi" }) === null);
 
+// ── argsHash properties (the binding is only as good as the hash) ──
+check("argsHash is key-order independent", argsHash({ to: "mom", body: "hi" }) === argsHash({ body: "hi", to: "mom" }));
+check("argsHash ignores the token field", argsHash({ to: "mom", body: "hi" }) === argsHash({ to: "mom", body: "hi", token: "tok_zzz" }));
+check("argsHash differs on any value change", argsHash({ to: "mom", body: "hi" }) !== argsHash({ to: "mom", body: "ho" }));
+check("argsHash differs when a key is added", argsHash({ to: "mom" }) !== argsHash({ to: "mom", body: "hi" }));
+check("argsHash deterministic for nested params", argsHash({ a: { x: 1, y: 2 } }) === argsHash({ a: { x: 1, y: 2 } }));
+
+// ── tool-binding is INDEPENDENT of args-binding, and a failed attempt must NOT burn the token ──
+const hUrl = argsHash({ url: "https://example.com" });
+s.registerToken("tokU", "open_url", hUrl);
+check("same-hash token cannot cross tools", s.consumeToken("tokU", "share_text", hUrl).ok === false);
+check("failed cross-tool attempt does not consume the token", s.consumeToken("tokU", "open_url", hUrl).ok === true);
+
+// ── hard stops on cross-vendor egress / sharing tools ──
+check("blocks payment via delegate_to_gemini", s.hardStop("delegate_to_gemini", { prompt: "go place an order on amazon" }) !== null);
+check("allows benign delegate_to_gemini", s.hardStop("delegate_to_gemini", { prompt: "what is the weather" }) === null);
+check("blocks payment via share_text", s.hardStop("share_text", { text: "please wire transfer the deposit" }) !== null);
+
 // ── kill switch ──
 s.registerToken("tokK", "send_sms", h);
 s.invalidateAll();
