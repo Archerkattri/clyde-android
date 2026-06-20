@@ -1,0 +1,38 @@
+# Build Clyde's bespoke embedded runtime (bootstrap-aarch64.zip) on a Linux runner with Docker, so
+# you don't need local WSL2/Docker or the multi-hour Node-from-source compile on your own machine.
+# Trigger manually (Actions → "Build embedded runtime" → Run workflow); download the artifact and
+# drop it into app/src/main/assets/ before building the APK.
+#
+# NOTE: the Node-from-source build for the custom prefix is heavy. If the standard runner OOMs or
+# times out, use a larger runner (runs-on: ubuntu-latest-8-cores) or self-hosted.
+name: Build embedded runtime
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for the brain bundle + JS CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Free up disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          df -h
+
+      - name: Build the bespoke bootstrap
+        run: bash bootstrap/build.sh
+
+      - name: Upload bootstrap-aarch64.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-aarch64
+          path: app/src/main/assets/bootstrap-aarch64.zip
+          if-no-files-found: error
+          retention-days: 14
