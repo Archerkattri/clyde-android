@@ -4,7 +4,21 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** What Clyde can do on THIS phone, detected locally. The brain merges this with rish/su probes. */
@@ -41,6 +55,29 @@ object CapabilityProbe {
 
     private fun granted(ctx: Context, perm: String) =
         ContextCompat.checkSelfPermission(ctx, perm) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Composable that probes capabilities OFF the main thread and re-probes on every ON_RESUME,
+     * so flipping Accessibility/overlay in system Settings and returning reflects immediately.
+     * Returns null until the first probe completes.
+     */
+    @Composable
+    fun rememberCaps(): Caps? {
+        val ctx = LocalContext.current
+        val owner = LocalLifecycleOwner.current
+        val scope = rememberCoroutineScope()
+        var caps by remember { mutableStateOf<Caps?>(null) }
+        DisposableEffect(owner) {
+            val obs = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    scope.launch { caps = withContext(Dispatchers.IO) { probe(ctx) } }
+                }
+            }
+            owner.lifecycle.addObserver(obs)
+            onDispose { owner.lifecycle.removeObserver(obs) }
+        }
+        return caps
+    }
 
     private fun isAccessibilityEnabled(ctx: Context): Boolean {
         val enabled = Settings.Secure.getString(

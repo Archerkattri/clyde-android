@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,6 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.kris.clyde.caps.CapabilityProbe
+import dev.kris.clyde.caps.Caps
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.Display
@@ -43,6 +47,7 @@ import dev.kris.clyde.ui.Eyebrow
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.SecondaryLink
+import dev.kris.clyde.ui.pressable
 
 private val RUNTIME_PERMS = arrayOf(
     android.Manifest.permission.RECORD_AUDIO,
@@ -58,7 +63,29 @@ private enum class SetupStep { Branch, Chooser, Pairing }
 @Composable
 fun SetupScreen(onDone: () -> Unit) {
     val ctx = LocalContext.current
-    val caps = remember { CapabilityProbe.probe(ctx) }
+    // Probe off the main thread; the branch decision needs the result, so show a beat of detection.
+    val caps by produceState<Caps?>(initialValue = null) {
+        value = withContext(Dispatchers.IO) { CapabilityProbe.probe(ctx) }
+    }
+    val c = caps
+    if (c == null) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(ClydeColor.Paper).padding(horizontal = 22.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Eyebrow("setup")
+            Spacer(Modifier.height(8.dp))
+            Text("Detecting your phone…", fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Muted)
+        }
+        return
+    }
+    SetupContent(c, onDone)
+}
+
+@Composable
+private fun SetupContent(caps: Caps, onDone: () -> Unit) {
+    val ctx = LocalContext.current
     val auto = caps.root || caps.customRom
     var step by remember { mutableStateOf(if (auto) SetupStep.Branch else SetupStep.Chooser) }
 
@@ -199,7 +226,7 @@ private fun ChoiceCard(title: String, tag: String, desc: String, why: String, fe
             .fillMaxWidth()
             .background(if (featured) ClydeColor.Paper else ClydeColor.Panel2, RoundedCornerShape(16.dp))
             .border(if (featured) 2.dp else 1.dp, if (featured) ClydeColor.Blue else ClydeColor.Line, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
+            .pressable(label = "$title plan") { onClick() }
             .padding(15.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -28,6 +28,7 @@ import dev.kris.clyde.login.VerifyScreen
 import dev.kris.clyde.setup.SetupScreen
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeTheme
+import dev.kris.clyde.ui.reduceMotion
 import dev.kris.clyde.util.Prefs
 
 class MainActivity : ComponentActivity() {
@@ -42,6 +43,7 @@ private enum class Screen { Login, Verify, Setup, Home }
 @Composable
 private fun ClydeRoot() {
     val ctx = LocalContext.current
+    val reduce = reduceMotion()
     var screen by remember { mutableStateOf(if (Prefs.signedIn) Screen.Home else Screen.Login) }
     Surface(modifier = Modifier.fillMaxSize(), color = ClydeColor.Paper) {
         AnimatedContent(
@@ -49,8 +51,9 @@ private fun ClydeRoot() {
             transitionSpec = {
                 val forward = targetState.ordinal >= initialState.ordinal
                 val dir = if (forward) 1 else -1
-                (slideInHorizontally(tween(340)) { w -> dir * w / 4 } + fadeIn(tween(300))) togetherWith
-                    (slideOutHorizontally(tween(340)) { w -> -dir * w / 4 } + fadeOut(tween(220)))
+                val slide = if (reduce) 0 else 340
+                (slideInHorizontally(tween(slide)) { w -> dir * w / 4 } + fadeIn(tween(if (reduce) 0 else 300))) togetherWith
+                    (slideOutHorizontally(tween(slide)) { w -> -dir * w / 4 } + fadeOut(tween(if (reduce) 0 else 220)))
             },
             label = "screen",
         ) { s ->

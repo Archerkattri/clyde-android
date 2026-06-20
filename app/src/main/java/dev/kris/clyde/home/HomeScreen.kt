@@ -53,6 +53,8 @@ import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
+import dev.kris.clyde.ui.pressable
+import dev.kris.clyde.ui.reduceMotion
 import dev.kris.clyde.util.Prefs
 import kotlinx.coroutines.launch
 
@@ -61,7 +63,10 @@ import kotlinx.coroutines.launch
 fun HomeScreen(onAsk: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val caps = remember { CapabilityProbe.probe(ctx) }
+    val caps = CapabilityProbe.rememberCaps()
+    val accessibilityOn = caps?.accessibility == true
+    val shizukuOn = caps?.shizuku == true
+    val rootOn = caps?.root == true
     var online by remember { mutableStateOf<Boolean?>(null) }
 
     LaunchedEffect(Unit) { online = BrainClient.healthz() }
@@ -97,9 +102,9 @@ fun HomeScreen(onAsk: () -> Unit) {
         Eyebrow("what clyde can do")
         Spacer(Modifier.height(6.dp))
         CapabilityRow("Apps, alarms, texts, navigation", "always on", live = true, on = true)
-        CapabilityRow("See & tap the screen", if (caps.accessibility) "on" else "tap to enable", live = caps.accessibility, on = caps.accessibility)
-        CapabilityRow("Type, install, change settings", if (caps.shizuku) "on" else "off", live = caps.shizuku, on = caps.shizuku)
-        CapabilityRow("Unrestricted (root)", if (caps.root) "on" else "off", live = caps.root, on = caps.root)
+        CapabilityRow("See & tap the screen", if (accessibilityOn) "on" else "tap to enable", live = accessibilityOn, on = accessibilityOn)
+        CapabilityRow("Type, install, change settings", if (shizukuOn) "on" else "off", live = shizukuOn, on = shizukuOn)
+        CapabilityRow("Unrestricted (root)", if (rootOn) "on" else "off", live = rootOn, on = rootOn)
 
         Spacer(Modifier.height(16.dp))
         Eyebrow("brain key")
@@ -119,7 +124,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             Text(
                 "Copy",
                 fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
-                modifier = Modifier.clickable {
+                modifier = Modifier.pressable(label = "Copy brain key") {
                     val clip = ctx.getSystemService(ClipboardManager::class.java)
                     clip?.setPrimaryClip(ClipData.newPlainText("CLYDE_KEY", Prefs.clydeKey))
                 }.padding(8.dp),
@@ -127,7 +132,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             Text(
                 "Sync",
                 fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueDeep,
-                modifier = Modifier.clickable {
+                modifier = Modifier.pressable(label = "Sync key to Termux") {
                     val k = Prefs.clydeKey
                     TermuxRunCommand.runInTermux(
                         ctx,
@@ -159,7 +164,7 @@ fun HomeScreen(onAsk: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) { Text("Clyde", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF06303C)) }
             Box(
-                Modifier.weight(1f).clickable { GeminiRouter.openAssistantPicker(ctx) }.padding(vertical = 9.dp),
+                Modifier.weight(1f).pressable(label = "Switch to Gemini") { GeminiRouter.openAssistantPicker(ctx) }.padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center,
             ) { Text("Gemini", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.Muted) }
         }
@@ -168,7 +173,7 @@ fun HomeScreen(onAsk: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp))
-                .clickable {
+                .pressable(label = "Stop Clyde and revoke tokens") {
                     scope.launch { BrainClient.kill() }
                     val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_KILL)
                     runCatching {
@@ -190,8 +195,9 @@ private fun CapabilityRow(name: String, status: String, live: Boolean, on: Boole
             .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val animate = live && !reduceMotion()
         Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-            if (live) {
+            if (animate) {
                 val t = rememberInfiniteTransition(label = "cap")
                 val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1500), RepeatMode.Restart), label = "capP")
                 Box(

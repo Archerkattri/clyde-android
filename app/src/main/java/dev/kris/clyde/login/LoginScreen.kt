@@ -1,6 +1,7 @@
 package dev.kris.clyde.login
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +39,7 @@ import dev.kris.clyde.ui.SecondaryLink
 @Composable
 fun LoginScreen(onStartSignIn: () -> Unit) {
     val ctx = LocalContext.current
+    var termuxError by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -69,18 +76,38 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         PrimaryButton("Open Termux & start sign-in", onClick = {
-            TermuxRunCommand.startClaudeLogin(ctx)
-            onStartSignIn()
+            if (TermuxRunCommand.startClaudeLogin(ctx)) {
+                termuxError = false
+                onStartSignIn()
+            } else {
+                termuxError = true
+            }
         })
         Spacer(Modifier.height(10.dp))
-        Text(
-            "Termux opens and runs claude login. Finish in your browser — Clyde never sees your password or token.",
-            fontFamily = Body,
-            fontSize = 12.5f.sp,
-            lineHeight = 18.sp,
-            color = ClydeColor.Muted,
-            textAlign = TextAlign.Center,
-        )
+        if (termuxError) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ClydeColor.TerracottaTint, RoundedCornerShape(12.dp))
+                    .border(1.dp, ClydeColor.Terracotta, RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+            ) {
+                Text("Termux didn't accept the command.", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.5f.sp, color = ClydeColor.Ink)
+                Text(
+                    "Install Termux + Termux:API from F-Droid and enable allow-external-apps, then try again.",
+                    fontFamily = Body, fontSize = 12.5f.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
+                )
+            }
+        } else {
+            Text(
+                "Termux opens and runs claude login. Finish in your browser — Clyde never sees your password or token.",
+                fontFamily = Body,
+                fontSize = 12.5f.sp,
+                lineHeight = 18.sp,
+                color = ClydeColor.Muted,
+                textAlign = TextAlign.Center,
+            )
+        }
         Spacer(Modifier.weight(1f))
         SecondaryLink("Signing in on the phone is awkward? Copy ~/.claude from desktop", onClick = {})
         SecondaryLink("Advanced: use an API key (not recommended)", onClick = {}, mono = true)

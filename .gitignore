@@ -32,3 +32,6 @@ Thumbs.db
 
 # --- design render artifacts (keep source .html, ignore throwaway renders) ---
 design/*.tmp.png
+
+# stray gradle log capture
+app/stdout

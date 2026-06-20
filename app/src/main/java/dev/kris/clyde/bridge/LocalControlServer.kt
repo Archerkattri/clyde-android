@@ -19,9 +19,9 @@ class LocalControlServer(
     private val ctx: Context,
     private val voice: VoiceIO,
     private val key: String,
-    private val confirmHandler: (summary: String, details: String?, action: String) -> Pair<Boolean, String?>,
+    private val confirmHandler: (summary: String, details: String?, action: String, params: JSONObject) -> Pair<Boolean, String?>,
     private val overlayStatus: (text: String, state: String?) -> Unit,
-    private val consumeIntentToken: (token: String, action: String) -> Boolean,
+    private val consumeIntentToken: (token: String, action: String, body: JSONObject) -> Boolean,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
@@ -60,7 +60,7 @@ class LocalControlServer(
                     if (name in CONSEQUENTIAL_INTENTS) {
                         val token = body.optString("token")
                         when {
-                            token.isBlank() || !consumeIntentToken(token, name) -> err("confirmation required: no valid token for $name")
+                            token.isBlank() || !consumeIntentToken(token, name, body) -> err("confirmation required: no valid token for $name")
                             DeviceIntents.fire(ctx, name, body) -> ok(JSONObject().put("fired", name))
                             else -> err("$name failed")
                         }
@@ -79,13 +79,14 @@ class LocalControlServer(
                         body.optString("summary"),
                         body.optString("details").ifBlank { null },
                         body.optString("action"),
+                        body.optJSONObject("params") ?: JSONObject(),
                     )
                     ok(JSONObject().put("approved", approved).also { if (token != null) it.put("token", token) })
                 }
                 uri == "/gemini/delegate" -> {
                     val token = body.optString("token")
                     when {
-                        token.isBlank() || !consumeIntentToken(token, "delegate_to_gemini") -> err("confirmation required: no valid token for gemini")
+                        token.isBlank() || !consumeIntentToken(token, "delegate_to_gemini", body) -> err("confirmation required: no valid token for gemini")
                         GeminiRouter.delegate(ctx, body.optString("prompt")) -> ok(JSONObject().put("delegated", true))
                         else -> err("gemini failed")
                     }

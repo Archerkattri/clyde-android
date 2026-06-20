@@ -57,12 +57,12 @@ export function makeTier0Intents(ctx: ToolCtx) {
     // ── consequential ──
     tool(
       "start_call",
-      "Place a phone call. Consequential — requires a confirm() token.",
-      { number: z.string().optional(), contact: z.string().optional(), token: z.string().describe("token from confirm()") },
+      "Place a phone call to a phone NUMBER (resolve a contact name to a number first, e.g. via the screen). Consequential — requires a confirm() token.",
+      { number: z.string(), token: z.string().describe("token from confirm()") },
       async (a) => {
         const g = gate(ctx, "start_call", a);
         if (g) return g;
-        return fire("start_call", { number: a.number, contact: a.contact, token: a.token }, `Calling ${a.contact ?? a.number}.`);
+        return fire("start_call", { number: a.number, token: a.token }, `Calling ${a.number}.`);
       }
     ),
 

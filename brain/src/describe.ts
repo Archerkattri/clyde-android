@@ -10,7 +10,7 @@ export function describeAction(tool: string, p: Record<string, unknown> = {}): A
   const s = (k: string) => String(p?.[k] ?? "");
   switch (tool) {
     case "send_sms": return { summary: `Text ${s("to")}`, details: s("body") };
-    case "start_call": return { summary: `Call ${s("contact") || s("number")}` };
+    case "start_call": return { summary: `Call ${s("number")}` };
     case "add_calendar_event": return { summary: `Add event "${s("title")}"`, details: s("startIso") };
     case "open_url": return { summary: "Open a link", details: s("url") };
     case "share_text": return { summary: "Share text to another app", details: s("content") || s("text") };

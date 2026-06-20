@@ -2,6 +2,8 @@ package dev.kris.clyde.login
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +35,7 @@ import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
+import dev.kris.clyde.ui.pressable
 import kotlinx.coroutines.delay
 
 /** Panel 02 — Confirming your plan. Polls the brain; verifies, never handles tokens. */
@@ -39,14 +43,20 @@ import kotlinx.coroutines.delay
 fun VerifyScreen(onContinue: () -> Unit) {
     var reachable by remember { mutableStateOf<Boolean?>(null) }
     var auth by remember { mutableStateOf<AuthStatus?>(null) }
+    var attempt by remember { mutableStateOf(0) }
+    var timedOut by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    // Keyed on `attempt` so "Check again" re-runs it; exits only when actually verified.
+    LaunchedEffect(attempt) {
+        timedOut = false
+        reachable = null
         repeat(40) {
             reachable = BrainClient.healthz()
             if (reachable == true) auth = BrainClient.authStatus()
-            if (reachable == true && auth != null) return@LaunchedEffect
+            if (reachable == true && auth?.subscription == true && auth?.apiKeyPresent == false) return@LaunchedEffect
             delay(1800)
         }
+        timedOut = true
     }
 
     val brainState = when (reachable) {
@@ -106,18 +116,27 @@ fun VerifyScreen(onContinue: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
 
-        CheckRow(brainState, "Brain reachable", if (brainState == CheckState.Ok) "127.0.0.1:8765" else "checking…")
-        CheckRow(subState, "Signed in on a subscription", auth?.plan ?: if (subState == CheckState.Ok) "subscription" else "checking…")
-        CheckRow(keyState, "No API key set", if (keyState == CheckState.Fail) "remove it" else if (keyState == CheckState.Ok) "clean" else "checking…")
+        CheckRow(brainState, "Brain reachable", when { brainState == CheckState.Ok -> "127.0.0.1:8765"; timedOut -> "offline"; else -> "checking…" })
+        CheckRow(subState, "Signed in on a subscription", when { subState == CheckState.Ok -> auth?.plan ?: "subscription"; subState == CheckState.Fail -> "sign in in Termux"; timedOut -> "not yet"; else -> "checking…" })
+        CheckRow(keyState, "No API key set", when { keyState == CheckState.Ok -> "clean"; keyState == CheckState.Fail -> "remove API key"; else -> "checking…" })
 
         Spacer(Modifier.weight(1f))
-        Text(
-            "Clyde refuses to run if an ANTHROPIC_API_KEY is present — subscription only, by design.",
-            fontFamily = Body,
-            fontSize = 12.sp,
-            color = ClydeColor.Faint,
-            modifier = Modifier.padding(bottom = 10.dp),
-        )
+        if (timedOut && !verified) {
+            Text(
+                "Couldn't confirm yet. Finish claude login in Termux and make sure the brain is running, then check again.",
+                fontFamily = Body, fontSize = 12.5f.sp, color = ClydeColor.Muted, modifier = Modifier.padding(bottom = 10.dp),
+            )
+            Box(
+                Modifier.fillMaxWidth().border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp)).pressable(label = "Check again") { attempt++ }.padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("Check again", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = ClydeColor.BlueDeep) }
+            Spacer(Modifier.height(10.dp))
+        } else {
+            Text(
+                "Clyde refuses to run if an ANTHROPIC_API_KEY is present — subscription only, by design.",
+                fontFamily = Body, fontSize = 12.sp, color = ClydeColor.Muted, modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
         PrimaryButton("Continue", onClick = onContinue, enabled = verified)
     }
 }

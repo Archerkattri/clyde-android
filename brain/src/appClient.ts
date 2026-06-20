@@ -76,7 +76,7 @@ export class AppClient {
   }
   /** Blocks until the user approves/denies in the app. Returns a one-time token on approval.
    *  `action` lets the app bind the issued token to this tool (defense-in-depth). */
-  confirm(b: { summary: string; details?: string; action: string }) {
+  confirm(b: { summary: string; details?: string; action: string; params?: Record<string, unknown> }) {
     return this.req<ConfirmResult>("POST", "/confirm", b, 120000);
   }
 }

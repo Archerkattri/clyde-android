@@ -96,13 +96,20 @@ class PhoneControlAccessibilityService : AccessibilityService() {
         return dispatchGesture(gesture, null, null)
     }
 
-    fun tapNode(nodeId: String): Boolean =
-        nodeMap[nodeId]?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+    fun tapNode(nodeId: String): Boolean {
+        val node = nodeMap[nodeId] ?: return false
+        node.refresh() // the window may have changed since the dump
+        if (node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+        // fall back to a coordinate tap on the node's last-known bounds
+        val b = Rect().also { node.getBoundsInScreen(it) }
+        return !b.isEmpty && tap(b.centerX(), b.centerY())
+    }
 
     fun setText(nodeId: String?, text: String): Boolean {
         val node = nodeId?.let { nodeMap[it] }
             ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
             ?: return false
+        node.refresh()
         val args = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }

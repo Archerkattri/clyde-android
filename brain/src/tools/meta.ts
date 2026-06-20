@@ -26,7 +26,8 @@ export function makeMetaTools(ctx: ToolCtx) {
         const params = (a.params ?? {}) as Record<string, unknown>;
         const { summary, details } = describeAction(a.action, params);
         ctx.emit({ type: "need_confirm", summary, details });
-        const r = await ctx.app.confirm({ summary, details, action: a.action });
+        // Send the params too so the app can independently bind the token to the exact args.
+        const r = await ctx.app.confirm({ summary, details, action: a.action, params });
         if (!r.ok || !r.result) return err(`could not show the confirmation sheet: ${r.error ?? "no response"}`);
         const { approved, token } = r.result;
         if (!approved || !token) return text(JSON.stringify({ approved: false }));

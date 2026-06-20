@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -64,9 +66,12 @@ import dev.kris.clyde.ui.ClydeTheme
 import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.Serif
+import dev.kris.clyde.ui.pressable
+import dev.kris.clyde.ui.reduceMotion
 import java.security.SecureRandom
-import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 
 enum class OverlayMode { Hidden, Summon, Confirm }
 
@@ -96,19 +101,32 @@ class OverlayController(private val appCtx: Context) :
     private val wm = appCtx.getSystemService(WindowManager::class.java)
     private var view: ComposeView? = null
     private val ui = mutableStateOf(OverlayUi())
-    private val confirmResult = SynchronousQueue<Pair<Boolean, String?>>()
+    private val confirmResult = ArrayBlockingQueue<Pair<Boolean, String?>>(1)
     private val confirmPending = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var pendingAction: String = ""
+    @Volatile private var pendingParams: JSONObject = JSONObject()
 
-    private data class IssuedToken(val action: String, val exp: Long)
+    private data class IssuedToken(val action: String, val params: JSONObject, val exp: Long)
     // tokens the user actually approved — the app validates intents against THIS, not the brain.
     private val issuedTokens = java.util.concurrent.ConcurrentHashMap<String, IssuedToken>()
     private val tokenTtlMs = 75_000L
 
-    /** Single-use, action-bound, TTL-bounded consume of an app-issued confirm token. */
-    fun consumeIssuedToken(token: String, action: String): Boolean {
+    // After an answer, let the success crab play once then settle to idle (don't hop forever).
+    private val settle = Runnable {
+        if (ui.value.clawd == ClawdState.Success) ui.value = ui.value.copy(clawd = ClawdState.Idle)
+    }
+
+    /** Single-use, action+args-bound, TTL consume: the intent the app is about to fire must
+     *  match the approved action AND the approved params (independent of what the brain claims). */
+    fun consumeIssuedToken(token: String, action: String, body: JSONObject): Boolean {
         val t = issuedTokens.remove(token) ?: return false
-        return t.action == action && System.currentTimeMillis() <= t.exp
+        if (t.action != action || System.currentTimeMillis() > t.exp) return false
+        val keys = t.params.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            if (body.optString(k) != t.params.optString(k)) return false
+        }
+        return true
     }
 
     fun clearIssuedTokens() = issuedTokens.clear()
@@ -120,26 +138,37 @@ class OverlayController(private val appCtx: Context) :
     }
 
     fun showSummon() = onMain {
+        main.removeCallbacks(settle)
         ui.value = OverlayUi(mode = OverlayMode.Summon, status = "Listening", clawd = ClawdState.Listening)
         attach()
     }
 
     fun transcript(text: String) = onMain { ui.value = ui.value.copy(transcript = text) }
-    fun status(text: String) = onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", clawd = ClawdState.Working); attach() }
-    fun answer(text: String) = onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", clawd = ClawdState.Success); attach() }
-    fun hide() = onMain { detach() }
+    fun status(text: String) = onMain { main.removeCallbacks(settle); ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", clawd = ClawdState.Working); attach() }
+    fun answer(text: String) = onMain {
+        main.removeCallbacks(settle)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", clawd = ClawdState.Success)
+        attach()
+        main.postDelayed(settle, 2200)
+    }
+    fun hide() = onMain { main.removeCallbacks(settle); detach() }
 
     /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies.
      *  Serialized: a second concurrent confirm is denied so a token never flows to the wrong waiter. */
-    fun confirmBlocking(summary: String, details: String?, action: String): Pair<Boolean, String?> {
+    fun confirmBlocking(summary: String, details: String?, action: String, params: JSONObject): Pair<Boolean, String?> {
         if (!confirmPending.compareAndSet(false, true)) return Pair(false, null)
         pendingAction = action
+        pendingParams = params
+        confirmResult.clear()
         onMain {
             ui.value = ui.value.copy(mode = OverlayMode.Confirm, confirmSummary = summary, confirmDetails = details, clawd = ClawdState.Error)
             attach()
         }
         return try {
-            confirmResult.poll(90, TimeUnit.SECONDS) ?: Pair(false, null)
+            confirmResult.poll(90, TimeUnit.SECONDS) ?: run {
+                onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon) } // clear stale confirm UI on timeout
+                Pair(false, null)
+            }
         } catch (_: InterruptedException) {
             Pair(false, null)
         } finally {
@@ -148,8 +177,11 @@ class OverlayController(private val appCtx: Context) :
     }
 
     private fun resolveConfirm(approved: Boolean) {
+        if (!confirmPending.compareAndSet(true, false)) return // first tap only — ignore double/late taps
         val token = if (approved) randomToken() else null
-        if (approved && token != null) issuedTokens[token] = IssuedToken(pendingAction, System.currentTimeMillis() + tokenTtlMs)
+        if (approved && token != null) {
+            issuedTokens[token] = IssuedToken(pendingAction, pendingParams, System.currentTimeMillis() + tokenTtlMs)
+        }
         confirmResult.offer(Pair(approved, token))
         onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }
     }
@@ -242,7 +274,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
 private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onClose: () -> Unit) {
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val anim by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "summon")
+    val anim by animateFloatAsState(if (shown) 1f else 0f, tween(if (reduceMotion()) 0 else 300), label = "summon")
     Box(
         Modifier
             .align(Alignment.BottomCenter)
@@ -271,7 +303,12 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             }
             Spacer(Modifier.height(10.dp))
             when {
-                ui.answer.isNotBlank() -> Text(ui.answer, fontFamily = Serif, fontSize = 16.sp, lineHeight = 23.sp, color = ClydeColor.Ink)
+                ui.answer.isNotBlank() -> Row(Modifier.height(IntrinsicSize.Min)) {
+                    // terracotta rule — the "Claude is speaking" mark
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(ClydeColor.Terracotta, RoundedCornerShape(2.dp)))
+                    Spacer(Modifier.size(12.dp))
+                    Text(ui.answer, fontFamily = Serif, fontSize = 16.sp, lineHeight = 23.sp, color = ClydeColor.Ink)
+                }
                 ui.transcript.isNotBlank() -> Text(ui.transcript, fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = ClydeColor.Ink)
                 else -> Text(ui.status.ifBlank { "Listening" }, fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = ClydeColor.Muted)
             }
@@ -296,7 +333,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
 private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit) {
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val anim by animateFloatAsState(if (shown) 1f else 0f, tween(300), label = "confirm")
+    val anim by animateFloatAsState(if (shown) 1f else 0f, tween(if (reduceMotion()) 0 else 300), label = "confirm")
     Box(
         Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)
             .graphicsLayer { translationY = (1f - anim) * 60f; alpha = anim },
@@ -308,7 +345,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
                 .border(2.dp, ClydeColor.Terracotta, RoundedCornerShape(22.dp))
                 .padding(18.dp),
         ) {
-            Text("CLYDE WANTS TO", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Faint)
+            Text("CLYDE WANTS TO", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted)
             Spacer(Modifier.height(8.dp))
             Text(ui.confirmSummary, fontFamily = Serif, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 25.sp, color = ClydeColor.Ink)
             if (!ui.confirmDetails.isNullOrBlank()) {
@@ -318,11 +355,11 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
-                    Modifier.weight(1f).border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp)).clickable { onDeny() }.padding(vertical = 13.dp),
+                    Modifier.weight(1f).border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp)).pressable(label = "Don't") { onDeny() }.padding(vertical = 13.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text("Don't", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = ClydeColor.Muted) }
                 Box(
-                    Modifier.weight(1.4f).background(ClydeColor.Blue, RoundedCornerShape(11.dp)).clickable { onApprove() }.padding(vertical = 13.dp),
+                    Modifier.weight(1.4f).background(ClydeColor.Blue, RoundedCornerShape(11.dp)).pressable(label = "Approve") { onApprove() }.padding(vertical = 13.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text("Approve", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF06303C)) }
             }
@@ -333,6 +370,10 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
 /** Voice-as-light: a blue pool that breathes (amplitude stand-in), not a literal waveform. */
 @Composable
 private fun VoiceLight() {
+    if (reduceMotion()) {
+        Box(Modifier.width(40.dp).height(16.dp).background(ClydeColor.Blue, RoundedCornerShape(999.dp)))
+        return
+    }
     val t = rememberInfiniteTransition(label = "voice")
     val a by t.animateFloat(
         initialValue = 0.45f,

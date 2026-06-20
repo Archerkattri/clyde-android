@@ -55,9 +55,9 @@ class AgentOrchestratorService : Service() {
                 ctx = applicationContext,
                 voice = voice,
                 key = Prefs.clydeKey,
-                confirmHandler = { summary, details, action -> overlay.confirmBlocking(summary, details, action) },
+                confirmHandler = { summary, details, action, params -> overlay.confirmBlocking(summary, details, action, params) },
                 overlayStatus = { text, _ -> overlay.status(text) },
-                consumeIntentToken = { token, action -> overlay.consumeIssuedToken(token, action) },
+                consumeIntentToken = { token, action, body -> overlay.consumeIssuedToken(token, action, body) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -126,7 +126,18 @@ class AgentOrchestratorService : Service() {
                 startForeground(NOTIF_ID, notif)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "startForeground failed", e)
+            // A microphone-typed FGS can throw if there's no while-in-use window. We MUST still
+            // fulfil the startForeground contract → retry as SPECIAL_USE only (no such requirement).
+            Log.w(TAG, "typed startForeground failed; retrying SPECIAL_USE only", e)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } else {
+                    startForeground(NOTIF_ID, notif)
+                }
+            } catch (e2: Exception) {
+                Log.e(TAG, "startForeground failed entirely", e2)
+            }
         }
     }
 

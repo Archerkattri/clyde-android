@@ -1,5 +1,6 @@
 package dev.kris.clyde.ui
 
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,10 +17,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,8 +63,27 @@ fun HeroMark(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * A tappable region that is always ≥48dp (WCAG 2.5.5) and announces itself to TalkBack as a button
+ * with [label]. Use instead of bare `Modifier.clickable` on custom (non-Button) tap targets.
+ */
 @Composable
-fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = ClydeColor.Faint) {
+fun Modifier.pressable(label: String? = null, role: Role = Role.Button, onClick: () -> Unit): Modifier =
+    this
+        .minimumInteractiveComponentSize()
+        .clickable(role = role, onClickLabel = label, onClick = onClick)
+
+/** True when the user has turned off animations in system settings — gate infinite/decorative motion. */
+@Composable
+fun reduceMotion(): Boolean {
+    val ctx = LocalContext.current
+    return remember {
+        Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+}
+
+@Composable
+fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = ClydeColor.Muted) {
     Text(
         text = text.uppercase(),
         fontFamily = Mono,
@@ -126,11 +154,22 @@ fun CheckRow(state: CheckState, title: String, note: String, modifier: Modifier 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
+        val boxBorder = if (state == CheckState.Pending) {
+            Modifier.drawBehind {
+                drawRoundRect(
+                    color = borderColor,
+                    cornerRadius = CornerRadius(7.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f))),
+                )
+            }
+        } else {
+            Modifier.border(1.dp, borderColor, RoundedCornerShape(7.dp))
+        }
         Box(
             modifier = Modifier
                 .size(22.dp)
                 .background(boxColor, RoundedCornerShape(7.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(7.dp)),
+                .then(boxBorder),
             contentAlignment = Alignment.Center,
         ) {
             when (state) {
