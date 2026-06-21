@@ -166,6 +166,36 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             )
         }
 
+        Spacer(Modifier.height(16.dp))
+        Eyebrow("assistant model")
+        Spacer(Modifier.height(6.dp))
+        var model by remember { mutableStateOf(Prefs.assistantModel) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+                .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf("opus" to "Opus", "sonnet" to "Sonnet", "haiku" to "Haiku").forEach { (id, label) ->
+                val sel = model == id
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .background(if (sel) ClydeColor.Blue else Color.Transparent, RoundedCornerShape(9.dp))
+                        .then(if (sel) Modifier else Modifier.pressable(label = "Use $label") { model = id; Prefs.assistantModel = id })
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(label, fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (sel) Color(0xFF06303C) else ClydeColor.Muted) }
+            }
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            "Opus — most capable · Sonnet — balanced · Haiku — fastest",
+            fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
+        )
+
         Spacer(Modifier.weight(1f))
         PrimaryButton("Ask Clyde", onClick = onAsk)
         Spacer(Modifier.height(12.dp))

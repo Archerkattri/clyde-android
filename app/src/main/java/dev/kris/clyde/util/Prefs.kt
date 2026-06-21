@@ -24,6 +24,7 @@ object Prefs {
     private const val KEY_CLYDE_ENC = "clyde_key_enc"  // base64( 12-byte IV | GCM ciphertext )
     private const val KEY_CLYDE_LEGACY = "clyde_key"   // old plaintext — migrated then removed
     private const val KEY_SIGNED_IN = "signed_in"
+    private const val KEY_MODEL = "assistant_model"
     private const val KS_ALIAS = "clyde_prefs_aeskey"
     private const val ANDROID_KS = "AndroidKeyStore"
 
@@ -51,6 +52,11 @@ object Prefs {
     var signedIn: Boolean
         get() = sp.getBoolean(KEY_SIGNED_IN, false)
         set(value) = sp.edit().putBoolean(KEY_SIGNED_IN, value).apply()
+
+    /** Assistant model the brain should use: "opus" | "sonnet" | "haiku". Default sonnet (balanced). */
+    var assistantModel: String
+        get() = sp.getString(KEY_MODEL, "sonnet") ?: "sonnet"
+        set(value) = sp.edit().putString(KEY_MODEL, value).apply()
 
     private fun store(value: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

@@ -44,15 +44,17 @@ object BrainClient {
         }
     }
 
-    /** Stream a query to the brain. Each NDJSON event (status/action/delta/final/error) → onEvent. */
-    suspend fun query(text: String, sessionId: String, onEvent: (JSONObject) -> Unit) = withContext(Dispatchers.IO) {
+    /** Stream a query to the brain. Each NDJSON event (status/action/delta/final/error) → onEvent.
+     *  [model] is the user's assistant-model pick (opus|sonnet|haiku); blank → brain default. */
+    suspend fun query(text: String, sessionId: String, model: String? = null, onEvent: (JSONObject) -> Unit) = withContext(Dispatchers.IO) {
         try {
             val c = open("/query", "POST")
             c.doOutput = true
             c.readTimeout = 120_000
             c.setRequestProperty("Content-Type", "application/json")
-            val payload = JSONObject().put("text", text).put("sessionId", sessionId).toString()
-            c.outputStream.use { it.write(payload.toByteArray()) }
+            val payload = JSONObject().put("text", text).put("sessionId", sessionId)
+            if (!model.isNullOrBlank()) payload.put("model", model)
+            c.outputStream.use { it.write(payload.toString().toByteArray()) }
             if (c.responseCode in 200..299) {
                 c.inputStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->

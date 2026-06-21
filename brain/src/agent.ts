@@ -35,6 +35,7 @@ export function haltActiveTurn(): void {
 export interface RunArgs {
   text: string;
   sessionId: string;
+  model?: string; // per-query model override (opus|sonnet|haiku); falls back to config.model
 }
 
 export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
@@ -56,7 +57,8 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
     prompt: args.text,
     options: {
       systemPrompt: SYSTEM_PROMPT,
-      model: config.model,
+      model: args.model ?? config.model, // app's per-turn pick wins; else the brain default
+
       mcpServers: { [CLYDE_SERVER_NAME]: server },
       permissionMode: "default",
       includePartialMessages: true,
