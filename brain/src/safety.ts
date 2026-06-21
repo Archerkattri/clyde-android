@@ -73,20 +73,27 @@ export class Safety {
   /** Hard stops that apply even with a valid token. Returns a reason if blocked. */
   hardStop(tool: string, args: Record<string, unknown>): string | null {
     const blob = JSON.stringify(args ?? {}).toLowerCase();
-    // Explicit payment-ACTION phrases only (not bare "pay"/"payment") to avoid false
-    // positives like "Pay Kim" contacts or a "Payment history" menu.
+    // Money guard. The REAL backstop is user confirm() on every consequential action; this regex is
+    // only a heuristic tripwire (payment phrasing OR a currency amount next to a move-money verb).
+    // Still scoped to transaction-EXECUTING / egress tools, never perception/navigation.
     const moneyRe =
-      /\b(confirm payment|send money|transfer (funds|money)|place (an )?order|pay now|wire transfer|make (a )?payment|buy now|checkout now)\b/;
-    // Scope to transaction-EXECUTING / egress tools, never perception/navigation.
+      /\b(confirm payment|send money|transfer (funds|money)|place (an )?order|pay now|wire transfer|make (a )?payment|buy now|checkout|complete (the )?(purchase|order|payment)|venmo|zelle|paypal|cash ?app)\b/;
+    const amountWithVerb = /[$€£₩₹]\s?\d/.test(blob) && /\b(send|transfer|pay|wire|charge|buy|checkout)\b/.test(blob);
     const moneyTools = new Set(["shell", "su_shell", "open_url", "share_text", "delegate_to_gemini"]);
-    if (moneyTools.has(tool) && moneyRe.test(blob)) {
+    if (moneyTools.has(tool) && (moneyRe.test(blob) || amountWithVerb)) {
       return "blocked: this looks like a payment or financial action. Clyde never moves money — please do it yourself.";
     }
-    // Never let Clyde grant ITSELF permissions (no model-controlled escape hatch).
-    if (tool === "pm_grant" || tool === "grant_signature_perm") {
-      const pkg = String((args as { pkg?: unknown }).pkg ?? "");
-      if (pkg.includes(this.ownPackage)) {
+    // Never let Clyde grant ITSELF permissions — enforced tool-AGNOSTICALLY so a generic shell/root
+    // command (`pm grant dev.kris.clyde …`) can't route around the dedicated grant tools.
+    if (blob.includes(this.ownPackage.toLowerCase())) {
+      if (tool === "pm_grant" || tool === "grant_signature_perm") {
         return "blocked: Clyde will not grant new permissions to itself.";
+      }
+      if (
+        (tool === "shell" || tool === "su_shell" || tool === "inject_event") &&
+        /pm\s+grant|appops\s+set|pm\s+install|grant_runtime_permission/.test(blob)
+      ) {
+        return "blocked: Clyde will not grant new permissions to itself (via shell).";
       }
     }
     return null;

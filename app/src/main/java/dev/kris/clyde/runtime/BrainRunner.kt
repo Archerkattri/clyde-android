@@ -1,6 +1,7 @@
 package dev.kris.clyde.runtime
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.util.Log
 import java.io.File
 import kotlin.concurrent.thread
@@ -50,14 +51,20 @@ class BrainRunner(private val ctx: Context) {
     }
 
     private fun launchOnce(clydeKey: String): Boolean = try {
-        // keep the log from growing without bound across restarts
-        if (logFile.length() > 1_000_000L) logFile.delete()
         val node = EmbeddedRuntime.nodeBin(ctx)
         val prefixPath = prefix.absolutePath
         val pb = ProcessBuilder(node.absolutePath, brainEntry.absolutePath)
         pb.directory(brainEntry.parentFile)
         pb.redirectErrorStream(true)
-        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
+        // The brain's stdout/stderr can echo SMS/contacts/screen content the agent handled. Persist it
+        // ONLY in a debuggable build (capped); in release, discard so nothing sensitive lands on disk.
+        val debuggable = (ctx.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debuggable) {
+            if (logFile.length() > 1_000_000L) logFile.delete()
+            pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
+        } else {
+            pb.redirectOutput(File("/dev/null"))
+        }
         pb.environment().apply {
             put("PREFIX", prefixPath)
             put("HOME", home.absolutePath)
@@ -85,5 +92,6 @@ class BrainRunner(private val ctx: Context) {
         stopped = true
         runCatching { proc?.destroy() }
         proc = null
+        runCatching { logFile.delete() } // don't leave captured brain output on disk after a session
     }
 }

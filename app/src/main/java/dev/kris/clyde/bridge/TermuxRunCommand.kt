@@ -31,6 +31,13 @@ object TermuxRunCommand {
         )
     }.isSuccess
 
+    /** Bring Termux to the foreground via a normal app launch — works even before allow-external-apps
+     *  is enabled (unlike RUN_COMMAND), so the "Open Termux" button is reliable on a fresh install. */
+    fun openTermuxApp(ctx: Context): Boolean = runCatching {
+        val i = ctx.packageManager.getLaunchIntentForPackage(TERMUX) ?: return false
+        ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
+    }.getOrDefault(false)
+
     /** Opens a visible Termux session running `claude login` so the user can finish OAuth. */
     fun startClaudeLogin(ctx: Context): Boolean = runInTermux(ctx, "claude login", background = false)
 

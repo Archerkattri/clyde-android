@@ -62,17 +62,22 @@ private fun ClydeRoot() {
                 Screen.Login -> LoginScreen(onStartSignIn = { screen = Screen.BrainSetup })
                 Screen.BrainSetup -> BrainSetupScreen(
                     onConnected = { screen = Screen.Verify },
-                    onSkip = { screen = Screen.Verify },
+                    // "Set up later" must still land the user in the app (with a Home breadcrumb to
+                    // return) — not park them on Verify, which can never pass while the brain is down.
+                    onSkip = { Prefs.signedIn = true; screen = Screen.Setup },
                 )
                 Screen.Verify -> VerifyScreen(onContinue = {
                     Prefs.signedIn = true
                     screen = Screen.Setup
                 })
                 Screen.Setup -> SetupScreen(onDone = { screen = Screen.Home })
-                Screen.Home -> HomeScreen(onAsk = {
-                    val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_ASSIST)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
-                })
+                Screen.Home -> HomeScreen(
+                    onAsk = {
+                        val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_ASSIST)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+                    },
+                    onConnectBrain = { screen = Screen.BrainSetup },
+                )
             }
         }
     }

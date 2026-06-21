@@ -25,8 +25,9 @@ the obligations below apply.
 - Other brain npm deps (`zod`, `tsx`, etc.) — MIT/Apache, see their packages.
 
 ## App assets
-- **Clawd** mascot GIFs (`app/src/debug/assets/clawd/`) — **AGPL** (from `clawd-on-desk`); included in
-  **debug/personal builds only**. Redraw before shipping (`design/assets/clawd/`).
+- **Clawd** the mascot is our own original pixel art, **drawn in code** (`overlay/ClawdView`, no image
+  files; grid source in `design/assets/clawd/gen-sprite.mjs`). No third-party art is bundled — it
+  ships in every build with no license encumbrance.
 
 This NOTICE is informational, not legal advice. For any public/Play distribution, audit the bundled
 package licenses and Anthropic's terms first. (Note: a runtime that `exec`s binaries from app storage

@@ -91,9 +91,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    // Clawd mascot (animated GIF rendering) — Coil 3 (coil3 coordinates; local assets only, no network engine)
-    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
-    implementation("io.coil-kt.coil3:coil-gif:3.5.0")
+    // Clawd the mascot is drawn natively in Compose (overlay/ClawdView) — no image-loading or GIF
+    // library, so he ships in every build and can never go missing.
 
     // Frosted "liquid glass": in-app via Modifier.blur/RenderEffect (API 31+); the summon
     // overlay uses OS cross-window blur (FLAG_BLUR_BEHIND). No external glass lib needed.

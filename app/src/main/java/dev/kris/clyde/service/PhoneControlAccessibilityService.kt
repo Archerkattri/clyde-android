@@ -142,6 +142,17 @@ class PhoneControlAccessibilityService : AccessibilityService() {
         return performGlobalAction(a)
     }
 
+    /** The package owning the active window — used to gate screen-driving on sensitive apps. "" if unknown. */
+    fun foregroundPackage(): String =
+        runCatching { rootInActiveWindow?.packageName?.toString() }.getOrNull() ?: ""
+
+    /** Visible text/description of a dumped node — used to gate taps on pay/confirm targets. "" if unknown. */
+    fun nodeText(nodeId: String?): String {
+        val n = nodeId?.let { nodeMap[it] } ?: return ""
+        runCatching { n.refresh() }
+        return (n.text ?: n.contentDescription)?.toString() ?: ""
+    }
+
     /** Blocking screenshot → base64 PNG. */
     fun screenshotBase64(): String? {
         val latch = CountDownLatch(1)

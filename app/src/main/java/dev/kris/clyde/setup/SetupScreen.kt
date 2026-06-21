@@ -1,8 +1,10 @@
 package dev.kris.clyde.setup
 
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,10 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.caps.Caps
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +133,15 @@ private fun ColumnScope.GrantsView(onFinish: () -> Unit) {
     val permsGranted = caps?.perms?.values?.all { it } == true
     val overlayOn = caps?.overlay == true
     val accessibilityOn = caps?.accessibility == true
+    // Re-read on every ON_RESUME. Returning from the assistant picker changes ONLY the "assistant"
+    // secure setting, which is NOT part of Caps — so keying off the caps re-probe would stay stale.
+    val owner = LocalLifecycleOwner.current
+    var assistantOn by remember { mutableStateOf(isDefaultAssistant(ctx)) }
+    DisposableEffect(owner) {
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) assistantOn = isDefaultAssistant(ctx) }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -143,11 +158,12 @@ private fun ColumnScope.GrantsView(onFinish: () -> Unit) {
         fontFamily = Body, fontSize = 14.sp, lineHeight = 21.sp, color = ClydeColor.Muted,
     )
     Spacer(Modifier.height(16.dp))
+    GrantRow("Set Clyde as your assistant", "so the assist gesture opens Clyde, not Gemini", done = assistantOn) { openAssistantSettings(ctx) }
     GrantRow("App permissions", "mic, calls, texts, calendar, location", done = permsGranted) { permLauncher.launch(RUNTIME_PERMS) }
     GrantRow("Draw over apps", "for the summon overlay", done = overlayOn) { requestOverlay(ctx) }
     GrantRow("Accessibility", "to see & tap the screen", done = accessibilityOn) { openAccessibility(ctx) }
     Spacer(Modifier.weight(1f))
-    val allDone = permsGranted && overlayOn && accessibilityOn
+    val allDone = assistantOn && permsGranted && overlayOn && accessibilityOn
     PrimaryButton(if (allDone) "All set — open Clyde" else "Finish setup", onClick = onFinish)
 }
 
@@ -314,6 +330,28 @@ private fun requestOverlay(ctx: Context) {
 private fun openAccessibility(ctx: Context) {
     runCatching {
         ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+/** Is Clyde the system's chosen assist app? Checks the assist secure settings AND the assistant role,
+ *  since which one is populated is OEM-dependent for an ACTION_ASSIST app without a VoiceInteractionService. */
+private fun isDefaultAssistant(ctx: Context): Boolean = runCatching {
+    val pkg = ctx.packageName
+    val cr = ctx.contentResolver
+    val assistant = Settings.Secure.getString(cr, "assistant") ?: ""
+    val voiceInteraction = Settings.Secure.getString(cr, "voice_interaction_service") ?: ""
+    if (assistant.contains(pkg) || voiceInteraction.contains(pkg)) return@runCatching true
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val rm = ctx.getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && rm.isRoleHeld(RoleManager.ROLE_ASSISTANT)) return@runCatching true
+    }
+    false
+}.getOrDefault(false)
+
+/** Send the user to "Assist & voice input" (or Default apps) to pick Clyde — it can't be set silently. */
+private fun openAssistantSettings(ctx: Context) {
+    for (action in listOf(Settings.ACTION_VOICE_INPUT_SETTINGS, Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS, Settings.ACTION_SETTINGS)) {
+        if (runCatching { ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }.getOrDefault(false)) return
     }
 }
 

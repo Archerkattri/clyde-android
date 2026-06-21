@@ -43,3 +43,7 @@ app/src/main/assets/brain.tgz
 # generated embedded runtime (built by bootstrap/build.sh)
 app/src/main/assets/bootstrap-*.zip
 bootstrap/.work/
+
+# --- build cache + scratch QA renders (regenerable from scripts/) ---
+.kotlin/
+design/clawd/_*.png

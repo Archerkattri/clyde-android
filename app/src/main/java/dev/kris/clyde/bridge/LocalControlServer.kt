@@ -29,6 +29,7 @@ class LocalControlServer(
 
     companion object {
         const val PORT = 8766
+        const val MAX_BODY = 256 * 1024 // reject oversized request bodies before NanoHTTPD buffers them
         // Fail-closed allowlist: ONLY these intents fire without a user-approved token. Everything
         // else (open_url, share_text, send_sms, start_call, add_calendar_event, and any future
         // intent) is gated app-side, never trusting the brain to self-gate (defense-in-depth).
@@ -43,16 +44,21 @@ class LocalControlServer(
             // Loopback brain delivery for the Termux companion bootstrap (key-gated, non-secret).
             if (session.uri == "/bootstrap.sh") return serveAsset("clyde-bootstrap.sh", "text/x-shellscript; charset=utf-8", stripCr = true)
             if (session.uri == "/brain.tgz") return serveAsset("brain.tgz", "application/gzip", stripCr = false)
+            session.headers["content-length"]?.toLongOrNull()?.let {
+                if (it > MAX_BODY) return json(err("body too large"), Response.Status.BAD_REQUEST)
+            }
             val body = parseJson(session)
             val uri = session.uri
             val result: JSONObject = when {
                 uri == "/caps" -> ok(caps())
                 uri == "/a11y/dump" -> a11y { it.dumpTree() }
-                uri == "/a11y/tap" -> a11yBool {
+                uri == "/a11y/tap" -> a11yGuard("tap", { if (body.has("nodeId")) it.nodeText(body.getString("nodeId")) else "" }) {
                     if (body.has("nodeId")) it.tapNode(body.getString("nodeId"))
                     else it.tap(body.optInt("x"), body.optInt("y"))
                 }
-                uri == "/a11y/type" -> a11yBool { it.setText(body.optString("nodeId").ifBlank { null }, body.optString("text")) }
+                uri == "/a11y/type" -> a11yGuard("type", { body.optString("text") }) {
+                    it.setText(body.optString("nodeId").ifBlank { null }, body.optString("text"))
+                }
                 uri == "/a11y/swipe" -> a11yBool {
                     it.swipe(body.optInt("x1"), body.optInt("y1"), body.optInt("x2"), body.optInt("y2"), body.optLong("ms", 300))
                 }
@@ -120,7 +126,10 @@ class LocalControlServer(
     private fun authorized(session: IHTTPSession): Boolean {
         if (key.isEmpty()) return false // the app always generates a key; empty means misconfig → reject
         val provided = session.headers["x-clyde-key"] ?: return false
-        return MessageDigest.isEqual(provided.toByteArray(), key.toByteArray())
+        // Compare fixed-length SHA-256 digests so the length short-circuit can't leak the key's length.
+        val a = MessageDigest.getInstance("SHA-256").digest(provided.toByteArray())
+        val b = MessageDigest.getInstance("SHA-256").digest(key.toByteArray())
+        return MessageDigest.isEqual(a, b)
     }
 
     private fun caps(): JSONObject {
@@ -142,6 +151,25 @@ class LocalControlServer(
 
     private fun a11yBool(block: (PhoneControlAccessibilityService) -> Boolean): JSONObject {
         val svc = PhoneControlAccessibilityService.instance ?: return err("accessibility off")
+        return if (block(svc)) ok(JSONObject()) else err("action failed")
+    }
+
+    /** Gate a screen-driving action behind a user confirm when the foreground app or tap/typed target
+     *  looks payment/auth-sensitive. Closes the prompt-injection path where on-screen content steers
+     *  Clyde to tap "Pay"/"Confirm" — screen-driving is otherwise exempt from the confirm-token model. */
+    private fun a11yGuard(
+        action: String,
+        targetText: (PhoneControlAccessibilityService) -> String,
+        block: (PhoneControlAccessibilityService) -> Boolean,
+    ): JSONObject {
+        val svc = PhoneControlAccessibilityService.instance ?: return err("accessibility off")
+        val pkg = svc.foregroundPackage()
+        val text = runCatching { targetText(svc) }.getOrDefault("")
+        if (SensitiveContext.isSensitive(pkg, text)) {
+            val details = if (text.isNotBlank()) "“${text.take(60)}” in $pkg" else "in $pkg"
+            val (approved, _) = confirmHandler("Let Clyde $action here?", details, "ui_$action", JSONObject().put("pkg", pkg).put("text", text))
+            if (!approved) return err("blocked: “$action” in a sensitive app needs your ok")
+        }
         return if (block(svc)) ok(JSONObject()) else err("action failed")
     }
 
@@ -170,5 +198,23 @@ class LocalControlServer(
         newFixedLengthResponse(Response.Status.OK, mime, java.io.ByteArrayInputStream(bytes), bytes.size.toLong())
     } catch (_: Exception) {
         json(err("asset unavailable: $name"), Response.Status.INTERNAL_ERROR)
+    }
+}
+
+/** Heuristic: is a screen-driving action targeting a payment/auth-sensitive surface? Defense-in-depth
+ *  so tap/type can't silently push "Pay"/"Confirm" in a wallet, bank, or store via prompt injection. */
+private object SensitiveContext {
+    private val PKGS = setOf(
+        "com.android.vending",                          // Play Store (purchases)
+        "com.google.android.apps.walletnfcrel",         // Google Wallet
+        "com.google.android.apps.nbu.paisa.user",       // Google Pay
+    )
+    private val HINTS = listOf("bank", "wallet", "upi", "paypal", "venmo", "cash", "finance", "money", "credit", "invest", "coinbase", "binance", "crypto", "trading", "pay")
+    private val MONEY = Regex("\\b(pay|send money|transfer|withdraw|deposit|checkout|purchase|place order|authori[sz]e|confirm payment|buy now|send \\$)", RegexOption.IGNORE_CASE)
+    fun isSensitive(pkg: String, text: String): Boolean {
+        val p = pkg.lowercase()
+        if (pkg in PKGS) return true
+        if (HINTS.any { p.contains(it) }) return true
+        return text.isNotBlank() && MONEY.containsMatchIn(text)
     }
 }

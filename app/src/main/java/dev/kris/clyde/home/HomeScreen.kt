@@ -60,7 +60,7 @@ import kotlinx.coroutines.launch
 
 /** Panel 08 — Home / control center. */
 @Composable
-fun HomeScreen(onAsk: () -> Unit) {
+fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val caps = CapabilityProbe.rememberCaps()
@@ -97,6 +97,26 @@ fun HomeScreen(onAsk: () -> Unit) {
             lineHeight = 20.sp,
             color = ClydeColor.Muted,
         )
+
+        // Deferred-setup breadcrumb: if the brain isn't reachable, give a real way back to finish it.
+        if (online == false) {
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ClydeColor.BlueTint, RoundedCornerShape(12.dp))
+                    .border(1.dp, ClydeColor.Blue.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    .pressable(label = "Finish connecting the brain") { onConnectBrain() }
+                    .padding(13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Finish connecting the brain", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Ink)
+                    Text("Clyde can't think until its brain is online", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+                }
+                Text("Set up", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText)
+            }
+        }
 
         Spacer(Modifier.height(20.dp))
         Eyebrow("what clyde can do")

@@ -157,7 +157,7 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 ) { Text("Copy command", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = OnBlue) }
                 Box(
                     Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(10.dp))
-                        .pressable(label = "Open Termux") { TermuxRunCommand.runInTermux(ctx, "echo paste the Clyde command and press enter", background = false) }
+                        .pressable(label = "Open Termux") { TermuxRunCommand.openTermuxApp(ctx) }
                         .padding(horizontal = 16.dp, vertical = 9.dp),
                 ) { Text("Open Termux", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.Muted) }
             }
@@ -195,17 +195,28 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var loginActive by remember { mutableStateOf(false) }
     var loginStatus by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var runtimeError by remember { mutableStateOf(false) }
+    var brainError by remember { mutableStateOf(false) }
+    var attempt by remember { mutableStateOf(0) }
 
-    // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real state.
-    LaunchedEffect(Unit) {
+    // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real
+    // state. Keyed on `attempt` so "Try again" re-runs it. Bounded: fail loud instead of spinning forever.
+    LaunchedEffect(attempt) {
+        runtimeError = false; brainError = false
         val i = Intent(ctx, AgentOrchestratorService::class.java)
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
         }
+        var ticks = 0
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
             online = BrainClient.healthz()
             if (auth.isSignedIn()) signedIn = true
+            // Unpack should finish in ~90s; the brain should answer within ~30s after. Past that, surface
+            // a real failure with a retry rather than leaving every step card spinning indefinitely.
+            if (!runtimeReady && ticks >= 45) { runtimeError = true; return@LaunchedEffect }
+            if (runtimeReady && online != true && ticks >= 60) { brainError = true; return@LaunchedEffect }
+            ticks++
             delay(2000)
         }
     }
@@ -228,7 +239,11 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         Spacer(Modifier.height(18.dp))
 
         StepCard("1", "Runtime ready", done = runtimeReady) {
-            Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            if (runtimeError) {
+                Text("Couldn't unpack the runtime. Free up storage (~150 MB) and tap Try again, or reinstall Clyde.", fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep)
+            } else {
+                Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime… (first run can take a minute)", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            }
         }
         Spacer(Modifier.height(12.dp))
 
@@ -241,23 +256,28 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                     fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
                 )
                 Spacer(Modifier.height(10.dp))
+                val signInReady = runtimeReady && !loginActive
                 Box(
-                    Modifier.background(ClydeColor.Blue, RoundedCornerShape(10.dp))
+                    Modifier.background(if (signInReady || loginActive) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
                         .pressable(label = "Sign in to Claude") {
-                            if (runtimeReady && !loginActive) {
+                            if (signInReady) {
                                 loginActive = true; loginStatus = "starting…"
                                 auth.start(
                                     onLine = { loginStatus = it.trim().take(90) },
                                     onUrl = { url -> runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
                                     onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
                                 )
+                            } else if (!runtimeReady) {
+                                loginStatus = "Still unpacking the runtime — one moment…"
                             }
                         }
                         .padding(horizontal = 18.dp, vertical = 9.dp),
-                ) { Text(if (loginActive) "Signing in…" else "Sign in to Claude", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = OnBlue) }
-                if (loginActive) {
+                ) { Text(if (loginActive) "Signing in…" else if (!runtimeReady) "Waiting for runtime…" else "Sign in to Claude", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (signInReady || loginActive) OnBlue else ClydeColor.Muted) }
+                if (loginStatus.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+                }
+                if (loginActive) {
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = code, onValueChange = { code = it }, singleLine = true,
@@ -276,9 +296,22 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         StepCard("3", "Brain online", done = online == true) {
-            Text(if (online == true) "Running on 127.0.0.1:8765." else "Starting the brain…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            if (brainError) {
+                Text("The brain didn't start. Tap Try again; if it keeps failing, reopen Clyde.", fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep)
+            } else {
+                Text(if (online == true) "Running on 127.0.0.1:8765." else "Starting the brain…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            }
         }
         Spacer(Modifier.height(18.dp))
+        if (runtimeError || brainError) {
+            Box(
+                Modifier.fillMaxWidth().border(1.dp, ClydeColor.Line2, RoundedCornerShape(11.dp))
+                    .pressable(label = "Try again") { runtimeReady = false; online = null; attempt++ }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("Try again", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = ClydeColor.BlueText) }
+            Spacer(Modifier.height(10.dp))
+        }
         PrimaryButton("Continue", onClick = onConnected, enabled = online == true && signedIn)
         SecondaryLink("Finish setup later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))

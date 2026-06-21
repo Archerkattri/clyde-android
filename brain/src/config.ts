@@ -103,7 +103,6 @@ export const config = {
   // Explicit path to the JS claude-code CLI (cli.js). The embedded runtime sets this to the bundled
   // copy; unset on a normal Termux install (SDK finds `claude` on PATH). The native CLI is glibc-only.
   claudeCliPath: process.env.CLAUDE_CLI_PATH && process.env.CLAUDE_CLI_PATH.trim() !== "" ? process.env.CLAUDE_CLI_PATH : undefined,
-  devNoAuth: process.env.CLYDE_DEV_NOAUTH === "1",
   allowNonLoopback: process.env.CLYDE_ALLOW_NONLOOPBACK === "1",
 } as const;
 
@@ -119,7 +118,7 @@ export function assertServerSafe(): void {
     );
     process.exit(1);
   }
-  if (!config.clydeKey && !config.devNoAuth) {
+  if (!config.clydeKey) {
     console.error(
       "\n[clyde] FATAL: CLYDE_KEY is not set — refusing to run an unauthenticated agent endpoint.\n" +
         "  Generate one and put it in brain/.env AND the Clyde app (Home → brain key):\n" +

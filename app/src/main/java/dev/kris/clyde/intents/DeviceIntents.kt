@@ -94,8 +94,15 @@ object DeviceIntents {
     }
 
     private fun openUrl(ctx: Context, url: String): Boolean {
-        val u = if (url.startsWith("http")) url else "https://$url"
-        return start(ctx, Intent(Intent.ACTION_VIEW, Uri.parse(u)))
+        val trimmed = url.trim()
+        val u = when {
+            trimmed.startsWith("http://", true) || trimmed.startsWith("https://", true) -> trimmed
+            trimmed.contains("://") -> return false // a non-web scheme (intent:/file:/content:…) — refuse
+            else -> "https://$trimmed"               // bare domain → assume https
+        }
+        val parsed = runCatching { Uri.parse(u) }.getOrNull() ?: return false
+        if (parsed.scheme?.lowercase() !in setOf("http", "https")) return false // open_url is web-only
+        return start(ctx, Intent(Intent.ACTION_VIEW, parsed).addCategory(Intent.CATEGORY_BROWSABLE))
     }
 
     private fun shareText(ctx: Context, text: String, targetPackage: String?): Boolean =

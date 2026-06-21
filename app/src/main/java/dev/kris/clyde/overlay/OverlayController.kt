@@ -84,6 +84,7 @@ data class OverlayUi(
     val clawd: ClawdState = ClawdState.Idle,
     val confirmSummary: String = "",
     val confirmDetails: String? = null,
+    val confirmEffect: String = "",
 )
 
 /** Hosts the summon/confirm overlay in a WindowManager window (Compose + lifecycle owners). */
@@ -178,7 +179,7 @@ class OverlayController(private val appCtx: Context) :
         pendingParams = params
         confirmResult.clear()
         onMain {
-            ui.value = ui.value.copy(mode = OverlayMode.Confirm, confirmSummary = summary, confirmDetails = details, clawd = ClawdState.Error)
+            ui.value = ui.value.copy(mode = OverlayMode.Confirm, confirmSummary = summary, confirmDetails = details, confirmEffect = effectLine(action, params), clawd = ClawdState.Error)
             attach()
         }
         return try {
@@ -205,6 +206,27 @@ class OverlayController(private val appCtx: Context) :
     fun cancelPendingConfirm() {
         if (confirmPending.compareAndSet(true, false)) {
             confirmResult.offer(Pair(false, null))
+        }
+    }
+
+    /** What the approval ACTUALLY authorizes, built from the params the token is bound to (never the
+     *  brain's prose summary) — so the user reads the real URL / number / recipient, not a spoofable
+     *  caption. A compromised or prompt-injected brain can't show one thing and authorize another. */
+    private fun effectLine(action: String, p: JSONObject): String = when (action) {
+        "open_url" -> "Opens  " + p.optString("url")
+        "start_call" -> "Calls  " + p.optString("number").ifBlank { p.optString("to") }
+        "send_sms" -> "Texts ${p.optString("to")}:  “${p.optString("body").take(80)}”"
+        "share_text" -> "Shares to  " + p.optString("targetPackage").ifBlank { "another app" }
+        "add_calendar_event" -> "Adds event  “${p.optString("title")}”"
+        "delegate_to_gemini" -> "Asks Gemini:  “${p.optString("prompt").take(80)}”"
+        "" -> ""
+        else -> {
+            // unknown/UI action → show the raw approved params so nothing the token grants is hidden
+            val keys = ArrayList<String>()
+            val iter = p.keys()
+            while (iter.hasNext()) { val k = iter.next(); if (k != "token") keys.add(k) }
+            keys.sort()
+            keys.joinToString("   ") { k -> "$k=" + p.opt(k).toString().take(50) }
         }
     }
 
@@ -384,6 +406,19 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
             if (!ui.confirmDetails.isNullOrBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Text(ui.confirmDetails, fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            }
+            if (ui.confirmEffect.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(ClydeColor.Panel2, RoundedCornerShape(10.dp))
+                        .border(1.dp, ClydeColor.Line2, RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                ) {
+                    Text("EXACTLY WHAT HAPPENS", fontFamily = Mono, fontSize = 9.sp, color = ClydeColor.Muted)
+                    Spacer(Modifier.height(4.dp))
+                    Text(ui.confirmEffect, fontFamily = Mono, fontSize = 12.sp, lineHeight = 17.sp, color = ClydeColor.Ink)
+                }
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -17,12 +17,14 @@ adversarial review; findings fixed and re-verified.
   compared **constant-time** (timingSafeEqual / MessageDigest.isEqual).
 - 128-bit `SecureRandom` key, stored in app `MODE_PRIVATE` prefs + `brain/.env`. Surfaced in
   Home → "brain key" (Copy / one-tap Sync into `brain/.env`).
-- **Fail closed**: the brain refuses to start without a key (escape hatch `CLYDE_DEV_NOAUTH=1`)
+- **Fail closed**: the brain refuses to start without a key (there is **no** auth-bypass flag),
   and refuses non-loopback bind unless `CLYDE_ALLOW_NONLOOPBACK=1` (which then forces a key).
 
 ### Consequential-action gating
-- Tools are **safe** (reads/UI driving) or **consequential**. Default is consequential; only
-  an explicit allowlist is safe.
+- Tools are **safe** (reads) or **consequential**. Default is consequential; only an explicit
+  allowlist is safe. **Screen-driving** (`tap`/`type`) is additionally gated app-side: a user
+  confirm is required when the foreground app or the tap/typed target looks payment/auth-sensitive
+  (`SensitiveContext`) — defense-in-depth against on-screen prompt injection.
 - `confirm({action, params})` shows a **brain-derived** summary (not model-authored) and returns
   a **one-time token bound to `{tool, sha256(args)}`**, short TTL (~75s).
 - Enforced centrally in the brain's `canUseTool` (runs before every tool): halt check → hard

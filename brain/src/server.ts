@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { config, assertSubscriptionAuth, assertServerSafe, apiKeyPresent, offSubscriptionReasons } from "./config";
 import { runAgent, haltActiveTurn } from "./agent";
 import type { AgentEvent } from "./types";
@@ -17,14 +17,14 @@ const MAX_INFLIGHT = 1; // one supervised turn at a time (also prevents cross-tu
 let inFlight = 0;
 
 function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
-  return timingSafeEqual(ab, bb);
+  // Compare fixed-length digests so neither the timing nor a length pre-check leaks the key's length.
+  const ah = createHash("sha256").update(a).digest();
+  const bh = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ah, bh);
 }
 
 function authorized(req: IncomingMessage): boolean {
-  if (!config.clydeKey) return config.devNoAuth; // refuse unless dev-noauth opt-in
+  if (!config.clydeKey) return false; // no key configured → reject (the app always provisions one)
   const h = req.headers["x-clyde-key"];
   return typeof h === "string" && safeEqual(h, config.clydeKey);
 }
@@ -137,5 +137,5 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 });
 
 server.listen(config.brainPort, config.brainHost, () => {
-  console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: ${config.devNoAuth ? "DISABLED (dev)" : "shared-key"})`);
+  console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: shared-key)`);
 });

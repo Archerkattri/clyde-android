@@ -54,6 +54,15 @@ object EmbeddedRuntime {
 
         return runCatching {
             val staging = File(ctx.filesDir, "usr-staging").apply { deleteRecursively(); mkdirs() }
+            val stagingCanon = staging.canonicalPath
+            // zip-slip guard: every entry/symlink path MUST resolve inside the staging dir, so a
+            // crafted "../" name can never write outside the app's private runtime tree.
+            fun safeChild(name: String): File {
+                val f = File(staging, name)
+                val canon = f.canonicalPath
+                require(canon == stagingCanon || canon.startsWith(stagingCanon + File.separator)) { "unsafe path in bootstrap: $name" }
+                return f
+            }
             val symlinks = ArrayList<Pair<String, String>>() // target, linkPath
 
             ctx.assets.open(ASSET_ARM64).use { raw ->
@@ -66,14 +75,14 @@ object EmbeddedRuntime {
                                 val i = line.indexOf('←') // '←'
                                 if (i > 0) symlinks.add(line.substring(0, i) to line.substring(i + 1))
                             }
-                            entry.isDirectory -> File(staging, name).mkdirs()
+                            entry.isDirectory -> safeChild(name).mkdirs()
                             else -> {
-                                val out = File(staging, name)
+                                val out = safeChild(name)
                                 out.parentFile?.mkdirs()
                                 out.outputStream().use { zin.copyTo(it) }
                                 // executables in the bootstrap need 0700
                                 if (name.startsWith("bin/") || name.startsWith("libexec/") || name == "lib/apt/apt-helper") {
-                                    runCatching { Os.chmod(out.absolutePath, 448) } // 0o700
+                                    runCatching { Os.chmod(out.absolutePath, 448) }.onFailure { Log.w(TAG, "chmod failed: $name", it) } // 0o700
                                 }
                             }
                         }
@@ -84,9 +93,9 @@ object EmbeddedRuntime {
             }
 
             for ((target, linkPath) in symlinks) {
-                val link = File(staging, linkPath)
+                val link = safeChild(linkPath)
                 link.parentFile?.mkdirs()
-                runCatching { link.delete(); Os.symlink(target, link.absolutePath) }
+                runCatching { link.delete(); Os.symlink(target, link.absolutePath) }.onFailure { Log.w(TAG, "symlink failed: $linkPath ← $target", it) }
             }
 
             prefix.deleteRecursively()
