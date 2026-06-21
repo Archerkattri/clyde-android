@@ -56,8 +56,8 @@ class ClaudeAuth(private val ctx: Context) {
                 put("HOME", home.absolutePath)
                 put("TMPDIR", File(prefix, "tmp").apply { mkdirs() }.absolutePath)
                 put("PATH", "$prefixPath/bin:" + (get("PATH") ?: ""))
-                put("LD_LIBRARY_PATH", "$prefixPath/lib")
-                put("LD_PRELOAD", EmbeddedRuntime.termuxExecLib(ctx).absolutePath)
+                // node + native libs run from nativeLibraryDir (exec-allowed); no LD_PRELOAD (W^X).
+                put("LD_LIBRARY_PATH", "${EmbeddedRuntime.nativeLibDir(ctx).absolutePath}:$prefixPath/lib")
                 put("LANG", "en_US.UTF-8")
                 remove("ANTHROPIC_API_KEY")
             }

@@ -33,8 +33,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.1.11"
+        versionCode = 13
+        versionName = "0.1.12"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -79,6 +79,10 @@ android {
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        // Extract jniLibs to nativeLibraryDir as real files on disk — node is exec'd from there (the one
+        // location Android allows executing app code from). Without this, libs stay mmap'd in the APK
+        // and there's no file to execve. These ELFs are already stored uncompressed-friendly.
+        jniLibs { useLegacyPackaging = true }
     }
 }
 

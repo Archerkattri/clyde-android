@@ -67,13 +67,15 @@ class BrainRunner(private val ctx: Context) {
 
     private fun launchOnce(clydeKey: String): Boolean {
         val node = EmbeddedRuntime.nodeBin(ctx)
-        val lib = EmbeddedRuntime.termuxExecLib(ctx)
+        val nativeDir = EmbeddedRuntime.nativeLibDir(ctx)
+        val ssl = File(nativeDir, "libssl.so")
         val cli = File(prefix, "lib/node_modules/@anthropic-ai/claude-code/cli.js")
-        // Preflight facts — the first thing surfaced on screen if the brain won't come up. Tells us at
-        // a glance whether the binary is even present/executable (the W^X exec question) before we try.
+        // Preflight facts — the first thing surfaced on screen if the brain won't come up. node now
+        // runs from nativeLibraryDir (exec-allowed); these confirm it + a sample native lib are present.
         val preflight = buildString {
+            append("node: ${node.absolutePath}\n")
             append("node: exists=${node.exists()} exec=${node.canExecute()} size=${node.length() / 1024}KB\n")
-            append("preload: exists=${lib.exists()} size=${lib.length() / 1024}KB\n")
+            append("libs: libssl=${ssl.exists()}\n")
             append("cli: exists=${cli.exists()}")
         }
         diag = preflight
@@ -87,8 +89,10 @@ class BrainRunner(private val ctx: Context) {
                 put("HOME", home.absolutePath)
                 put("TMPDIR", File(prefix, "tmp").apply { mkdirs() }.absolutePath)
                 put("PATH", "${prefix.absolutePath}/bin:" + (get("PATH") ?: ""))
-                put("LD_LIBRARY_PATH", "${prefix.absolutePath}/lib")
-                put("LD_PRELOAD", lib.absolutePath) // W^X workaround
+                // node + its native libs live together in nativeLibraryDir (RUNPATH=$ORIGIN finds them);
+                // also expose the prefix lib for anything the brain reads. No LD_PRELOAD — that shim
+                // lived in app storage, which is exactly what W^X blocks.
+                put("LD_LIBRARY_PATH", "${nativeDir.absolutePath}:${prefix.absolutePath}/lib")
                 put("LANG", "en_US.UTF-8")
                 put("CLYDE_KEY", clydeKey)
                 put("CLAUDE_CLI_PATH", cli.absolutePath)
