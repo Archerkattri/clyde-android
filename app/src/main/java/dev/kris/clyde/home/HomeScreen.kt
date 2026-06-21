@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.overlay.ClawdSceneView
+import dev.kris.clyde.runtime.CodexAuth
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -201,6 +202,10 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             else "Opus — most capable · Sonnet — balanced · Haiku — fastest",
             fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
         )
+        if (backend == "codex") {
+            Spacer(Modifier.height(10.dp))
+            CodexSignIn()
+        }
 
         Spacer(Modifier.weight(1f))
         PrimaryButton("Ask Clyde", onClick = onAsk)
@@ -239,6 +244,48 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
                 .padding(vertical = 13.dp),
             contentAlignment = Alignment.Center,
         ) { Text("Stop Clyde · revoke tokens", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Danger) }
+    }
+}
+
+/** Codex (ChatGPT subscription) sign-in — runs `codex login` in the embedded runtime, opens the OAuth
+ *  page in the real default browser, and shows the device code. No-op until the codex binary ships. */
+@Composable
+private fun CodexSignIn() {
+    val ctx = LocalContext.current
+    val auth = remember { CodexAuth(ctx) }
+    val signedIn = remember { auth.isSignedIn() }
+    var active by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxWidth()
+            .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+            .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+    ) {
+        Text("Codex sign-in", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.Ink)
+        Spacer(Modifier.height(6.dp))
+        if (signedIn) {
+            Text("Signed in on your ChatGPT subscription.", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+        } else {
+            Box(
+                Modifier.background(ClydeColor.Blue, RoundedCornerShape(9.dp))
+                    .pressable(label = "Sign in to Codex") {
+                        if (!active) {
+                            active = true; status = "starting…"
+                            auth.start(
+                                onLine = { status = it.trim().take(90) }, // the device code prints here
+                                onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
+                                onResult = { ok -> active = false; status = if (ok) "signed in" else "sign-in didn't complete — try again" },
+                            )
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) { Text(if (active) "Signing in…" else "Sign in to Codex", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF06303C)) }
+            if (status.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(status, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+            }
+        }
     }
 }
 
