@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
+import dev.kris.clyde.overlay.ClawdSceneView
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -78,8 +79,10 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ClydeLogo(size = 28.dp, contentDescription = null) // wordmark below announces "Clyde"
-            Spacer(Modifier.size(10.dp))
+            // Clawd is the live status face: calm idle when the brain is online, a little down when
+            // it's offline, thinking while the first health check is still in flight.
+            ClawdSceneView(sceneKey = when (online) { true -> "idle"; false -> "sad"; null -> "thinking" }, size = 44.dp)
+            Spacer(Modifier.size(8.dp))
             Row {
                 Text("Clyde", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 27.sp, letterSpacing = (-0.03).em, color = ClydeColor.Ink)
                 Text(".", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 27.sp, color = ClydeColor.Blue)

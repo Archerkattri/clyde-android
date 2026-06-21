@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import dev.kris.clyde.bridge.AuthStatus
 import dev.kris.clyde.bridge.BrainClient
+import dev.kris.clyde.overlay.ClawdSceneView
 import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.CheckRow
@@ -85,6 +86,17 @@ fun VerifyScreen(onContinue: () -> Unit) {
             .background(ClydeColor.Paper)
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
+        val scene = when {
+            verified -> "success"
+            subState == CheckState.Fail || keyState == CheckState.Fail -> "error"
+            timedOut -> "warning"
+            reachable == true -> "thinking"
+            else -> "searching"
+        }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ClawdSceneView(sceneKey = scene, size = 84.dp)
+        }
+        Spacer(Modifier.height(10.dp))
         Eyebrow("sign-in · verifying")
         Spacer(Modifier.height(6.dp))
         Text(

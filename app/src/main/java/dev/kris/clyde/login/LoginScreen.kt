@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import dev.kris.clyde.overlay.ClawdSceneView
 import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
@@ -45,7 +46,9 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
             .padding(horizontal = 22.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(14.dp))
+        ClawdSceneView(sceneKey = "greeting", size = 96.dp) // a waving hello on first run
+        Spacer(Modifier.height(8.dp))
         HeroMark()
         Spacer(Modifier.height(18.dp))
         Text(
