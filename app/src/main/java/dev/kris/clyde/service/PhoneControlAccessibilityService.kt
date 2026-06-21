@@ -31,6 +31,8 @@ class PhoneControlAccessibilityService : AccessibilityService() {
 
     // accessed from NanoHTTPD worker threads (dump writes, tap/type read) → concurrent-safe
     private val nodeMap = java.util.concurrent.ConcurrentHashMap<String, AccessibilityNodeInfo>()
+    // one reused single-thread executor for screenshots (don't spin a new one per call)
+    private val screenshotExec = Executors.newSingleThreadExecutor()
 
     override fun onServiceConnected() {
         instance = this
@@ -43,6 +45,7 @@ class PhoneControlAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         instance = null
+        screenshotExec.shutdown()
         super.onDestroy()
     }
 
@@ -157,8 +160,7 @@ class PhoneControlAccessibilityService : AccessibilityService() {
     fun screenshotBase64(): String? {
         val latch = CountDownLatch(1)
         var result: String? = null
-        val exec = Executors.newSingleThreadExecutor()
-        takeScreenshot(Display.DEFAULT_DISPLAY, exec, object : TakeScreenshotCallback {
+        takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExec, object : TakeScreenshotCallback {
             override fun onSuccess(screenshot: ScreenshotResult) {
                 var hb: HardwareBuffer? = null
                 try {
@@ -183,7 +185,6 @@ class PhoneControlAccessibilityService : AccessibilityService() {
             }
         })
         latch.await(8, TimeUnit.SECONDS)
-        exec.shutdown()
         return result
     }
 }
