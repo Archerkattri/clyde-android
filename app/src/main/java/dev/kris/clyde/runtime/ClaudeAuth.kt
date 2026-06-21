@@ -21,6 +21,13 @@ class ClaudeAuth(private val ctx: Context) {
     @Volatile private var proc: Process? = null
     @Volatile private var stdin: OutputStreamWriter? = null
 
+    /** Last ~14 lines the CLI printed — the real reason shown to the user if sign-in fails. */
+    @Volatile var outputTail: String = ""; private set
+    private val tail = ArrayDeque<String>()
+    private fun pushLine(line: String) {
+        synchronized(tail) { tail.addLast(line); while (tail.size > 14) tail.removeFirst(); outputTail = tail.joinToString("\n") }
+    }
+
     private val prefix get() = EmbeddedRuntime.prefixDir(ctx)
     private val home get() = EmbeddedRuntime.homeDir(ctx)
     private val cli get() = File(prefix, "lib/node_modules/@anthropic-ai/claude-code/cli.js")
@@ -35,7 +42,8 @@ class ClaudeAuth(private val ctx: Context) {
     @Synchronized
     fun start(onLine: (String) -> Unit, onUrl: (String) -> Unit, onResult: (Boolean) -> Unit) {
         if (isRunning()) return
-        if (!cli.exists()) { Log.w(tag, "claude CLI missing: ${cli.absolutePath}"); onResult(false); return }
+        synchronized(tail) { tail.clear(); outputTail = "" }
+        if (!cli.exists()) { outputTail = "claude CLI missing at ${cli.absolutePath}"; Log.w(tag, outputTail); onResult(false); return }
         try {
             val node = EmbeddedRuntime.nodeBin(ctx)
             val prefixPath = prefix.absolutePath
@@ -60,6 +68,7 @@ class ClaudeAuth(private val ctx: Context) {
             thread(name = "clyde-auth-out", isDaemon = true) {
                 p.inputStream.bufferedReader().use { r: BufferedReader ->
                     r.forEachLine { line ->
+                        pushLine(line)
                         onLine(line)
                         if (!urlSent) urlRegex.find(line)?.let { urlSent = true; onUrl(it.value) }
                     }
@@ -72,6 +81,7 @@ class ClaudeAuth(private val ctx: Context) {
             }
             Log.i(tag, "claude login started")
         } catch (e: Exception) {
+            outputTail = "couldn't start: ${e.javaClass.simpleName}: ${e.message ?: ""}"
             Log.e(tag, "claude login failed to start", e)
             onResult(false)
         }
