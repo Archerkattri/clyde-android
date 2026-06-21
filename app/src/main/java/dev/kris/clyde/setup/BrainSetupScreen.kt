@@ -202,25 +202,31 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var code by remember { mutableStateOf("") }
     var runtimeError by remember { mutableStateOf(false) }
     var brainError by remember { mutableStateOf(false) }
+    var lowStorage by remember { mutableStateOf(false) }
     var attempt by remember { mutableStateOf(0) }
 
     // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real
     // state. Keyed on `attempt` so "Try again" re-runs it. Bounded: fail loud instead of spinning forever.
     LaunchedEffect(attempt) {
         runtimeError = false; brainError = false
+        lowStorage = EmbeddedRuntime.lowStorage(ctx) // genuine out-of-space → fail fast with a clear message
         val i = Intent(ctx, AgentOrchestratorService::class.java)
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
         }
         var ticks = 0
+        var readyAtTick = -1
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
             online = BrainClient.healthz()
             if (auth.isSignedIn()) signedIn = true
-            // Unpack should finish in ~90s; the brain should answer within ~30s after. Past that, surface
-            // a real failure with a retry rather than leaving every step card spinning indefinitely.
-            if (!runtimeReady && ticks >= 45) { runtimeError = true; return@LaunchedEffect }
-            if (runtimeReady && online != true && ticks >= 60) { brainError = true; return@LaunchedEffect }
+            if (runtimeReady && readyAtTick < 0) readyAtTick = ticks
+            // First-run unpack (~200 MB, thousands of small files) is legitimately slow on a phone — wait
+            // up to ~5 min before declaring failure. If we're genuinely out of space it won't unpack at
+            // all, so fail fast there. The brain gets ~90s AFTER the unpack actually finishes.
+            if (lowStorage && !runtimeReady && ticks >= 3) { runtimeError = true; return@LaunchedEffect }
+            if (!runtimeReady && ticks >= 150) { runtimeError = true; return@LaunchedEffect }
+            if (runtimeReady && online != true && readyAtTick >= 0 && ticks - readyAtTick >= 45) { brainError = true; return@LaunchedEffect }
             if (runtimeReady && online == true && signedIn) return@LaunchedEffect // fully ready — stop polling
             ticks++
             delay(2000)
@@ -258,9 +264,13 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
 
         StepCard("1", "Runtime ready", done = runtimeReady) {
             if (runtimeError) {
-                Text("Couldn't unpack the runtime. Free up storage (~150 MB) and tap Try again, or reinstall Clyde.", fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep)
+                Text(
+                    if (lowStorage) "Low on storage — the runtime needs ~280 MB free to unpack (you have ${EmbeddedRuntime.freeMb(ctx)} MB). Free some space, then tap Try again."
+                    else "Couldn't finish unpacking the runtime. First run can take a few minutes — tap Try again and leave Clyde open; if it keeps failing, reinstall Clyde.",
+                    fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep,
+                )
             } else {
-                Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime… (first run can take a minute)", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+                Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime… (first run can take a few minutes — leave Clyde open)", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
             }
         }
         Spacer(Modifier.height(12.dp))
