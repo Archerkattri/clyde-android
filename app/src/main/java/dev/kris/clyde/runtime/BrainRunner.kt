@@ -3,6 +3,7 @@ package dev.kris.clyde.runtime
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.util.Log
+import dev.kris.clyde.util.Prefs
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -91,6 +92,10 @@ class BrainRunner(private val ctx: Context) {
             put("BRAIN_HOST", "127.0.0.1")
             put("BRAIN_PORT", "8765")
             remove("ANTHROPIC_API_KEY") // subscription only — never bill per token
+            // The pasted subscription token (from desktop `claude setup-token`) authenticates the brain
+            // headlessly — the supported way to run the subscription without an interactive TTY login.
+            val token = Prefs.oauthToken
+            if (token.isNotBlank()) put("CLAUDE_CODE_OAUTH_TOKEN", token)
         }
         proc = pb.start()
         Log.i(tag, "brain started (${node.name} ${brainEntry.name})")

@@ -24,6 +24,7 @@ object Prefs {
     private const val KEY_CLYDE_ENC = "clyde_key_enc"  // base64( 12-byte IV | GCM ciphertext )
     private const val KEY_CLYDE_LEGACY = "clyde_key"   // old plaintext — migrated then removed
     private const val KEY_SIGNED_IN = "signed_in"
+    private const val KEY_OAUTH_ENC = "oauth_token_enc" // CLAUDE_CODE_OAUTH_TOKEN, encrypted at rest
     private const val KEY_MODEL = "assistant_model"
     private const val KS_ALIAS = "clyde_prefs_aeskey"
     private const val ANDROID_KS = "AndroidKeyStore"
@@ -57,6 +58,28 @@ object Prefs {
     var assistantModel: String
         get() = sp.getString(KEY_MODEL, "sonnet") ?: "sonnet"
         set(value) = sp.edit().putString(KEY_MODEL, value).apply()
+
+    /** The subscription CLAUDE_CODE_OAUTH_TOKEN (from desktop `claude setup-token`), encrypted at rest
+     *  under the same TEE Keystore key as the loopback secret. "" when not set. */
+    var oauthToken: String
+        get() = runCatching {
+            val blob = Base64.decode(sp.getString(KEY_OAUTH_ENC, "") ?: "", Base64.NO_WRAP)
+            if (blob.size <= 12) return@runCatching ""
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, aesKey(), GCMParameterSpec(128, blob, 0, 12))
+            String(cipher.doFinal(blob, 12, blob.size - 12), Charsets.UTF_8)
+        }.getOrDefault("")
+        set(value) {
+            if (value.isBlank()) { sp.edit().remove(KEY_OAUTH_ENC).apply(); return }
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, aesKey())
+            val iv = cipher.iv
+            val ct = cipher.doFinal(value.trim().toByteArray(Charsets.UTF_8))
+            val blob = ByteArray(iv.size + ct.size)
+            System.arraycopy(iv, 0, blob, 0, iv.size)
+            System.arraycopy(ct, 0, blob, iv.size, ct.size)
+            sp.edit().putString(KEY_OAUTH_ENC, Base64.encodeToString(blob, Base64.NO_WRAP)).apply()
+        }
 
     private fun store(value: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

@@ -31,6 +31,7 @@ class AgentOrchestratorService : Service() {
     companion object {
         const val ACTION_ASSIST = "dev.kris.clyde.ASSIST"
         const val ACTION_KILL = "dev.kris.clyde.KILL"
+        const val ACTION_RESTART_BRAIN = "dev.kris.clyde.RESTART_BRAIN"
         private const val CHANNEL = "clyde_orchestrator"
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
@@ -92,6 +93,8 @@ class AgentOrchestratorService : Service() {
                 overlay.hide()
                 voice.stopListening()
             }
+            // Token just pasted → bounce the brain so it relaunches WITH CLAUDE_CODE_OAUTH_TOKEN.
+            ACTION_RESTART_BRAIN -> { brain.stop(); maybeStartEmbeddedBrain() }
         }
         return START_STICKY
     }

@@ -198,10 +198,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var runtimeReady by remember { mutableStateOf(false) }
     var online by remember { mutableStateOf<Boolean?>(null) }
     var signedIn by remember { mutableStateOf(false) }
-    var loginActive by remember { mutableStateOf(false) }
-    var loginStatus by remember { mutableStateOf("") }
-    var loginDetail by remember { mutableStateOf("") } // real CLI output tail, shown if sign-in fails
-    var code by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") } // pasted setup token
     var runtimeError by remember { mutableStateOf(false) }
     var brainError by remember { mutableStateOf(false) }
     var lowStorage by remember { mutableStateOf(false) }
@@ -249,7 +246,6 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         val scene = when {
             runtimeError || brainError -> "error"
             runtimeReady && online == true && signedIn -> "success"
-            loginActive -> "thinking"
             else -> "working"
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -300,52 +296,46 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 Text("Signed in on your subscription.", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
             } else {
                 Text(
-                    "Opens Claude in your browser to authorize. Clyde never sees your password or token.",
+                    "The login CLI needs a real terminal, so sign in with a one-time token. On a computer that has Claude Code, run this in a terminal:",
                     fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
                 )
-                Spacer(Modifier.height(10.dp))
-                val signInReady = runtimeReady && !loginActive
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth().background(Color0E, RoundedCornerShape(10.dp)).border(1.dp, Color1E, RoundedCornerShape(10.dp)).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("claude setup-token", fontFamily = Mono, fontSize = 12.5f.sp, color = TermFg, modifier = Modifier.weight(1f))
+                    Text(
+                        "Copy", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = ClydeColor.BlueText,
+                        modifier = Modifier.pressable(label = "Copy command") {
+                            ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("cmd", "claude setup-token"))
+                        }.padding(6.dp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Authorize in the browser it opens, then copy the token it prints and paste it here:",
+                    fontFamily = Body, fontSize = 12.5f.sp, lineHeight = 17.sp, color = ClydeColor.Muted,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = code, onValueChange = { code = it }, singleLine = true,
+                    label = { Text("paste your token", fontFamily = Body, fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
                 Box(
-                    Modifier.background(if (signInReady || loginActive) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
-                        .pressable(label = "Sign in to Claude") {
-                            if (signInReady) {
-                                loginActive = true; loginStatus = "starting…"; loginDetail = ""
-                                auth.start(
-                                    onLine = { line -> val t = line.trim(); if (t.isNotEmpty()) { loginStatus = t.take(90); loginDetail = (loginDetail + "\n" + t).takeLast(500) } },
-                                    onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
-                                    onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
-                                )
-                            } else if (!runtimeReady) {
-                                loginStatus = "Still unpacking the runtime — one moment…"
+                    Modifier.background(if (code.isNotBlank()) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
+                        .pressable(label = "Save token") {
+                            if (code.isNotBlank()) {
+                                Prefs.oauthToken = code.trim(); code = ""; signedIn = true
+                                // restart the brain so it picks up CLAUDE_CODE_OAUTH_TOKEN at launch
+                                val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_RESTART_BRAIN)
+                                runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i) }
                             }
                         }
                         .padding(horizontal = 18.dp, vertical = 9.dp),
-                ) { Text(if (loginActive) "Signing in…" else if (!runtimeReady) "Waiting for runtime…" else "Sign in to Claude", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (signInReady || loginActive) OnBlue else ClydeColor.Muted) }
-                if (loginStatus.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
-                }
-                if (loginStatus.contains("didn't")) {
-                    val detail = loginDetail.ifBlank { auth.outputTail }
-                    if (detail.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("details: ${detail.trim().takeLast(420)}", fontFamily = Mono, fontSize = 10.sp, lineHeight = 14.sp, color = ClydeColor.TerracottaDeep)
-                    }
-                }
-                if (loginActive) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = code, onValueChange = { code = it }, singleLine = true,
-                        label = { Text("paste code (only if asked)", fontFamily = Body, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(9.dp))
-                            .pressable(label = "Submit code") { if (code.isNotBlank()) { auth.submit(code); code = "" } }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    ) { Text("Submit code", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText) }
-                }
+                ) { Text("Save token", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (code.isNotBlank()) OnBlue else ClydeColor.Muted) }
             }
         }
         Spacer(Modifier.height(12.dp))
