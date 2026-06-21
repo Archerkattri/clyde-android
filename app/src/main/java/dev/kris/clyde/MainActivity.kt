@@ -3,7 +3,6 @@ package dev.kris.clyde
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -37,24 +36,10 @@ import dev.kris.clyde.util.Prefs
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Clyde is a pop-up assistant, not an app you sit in. Once it's set up (signed in + overlay
-        // permission granted), launching the icon SUMMONS THE FLOATING POPUP and gets out of the way —
-        // it does not open the full control center. The control center stays reachable via the launcher
-        // long-press "Clyde settings" shortcut (action HOME), and during onboarding we always show the UI.
-        val wantsHome = intent?.action == ACTION_HOME
-        if (!wantsHome && Prefs.signedIn && Settings.canDrawOverlays(this)) {
-            val i = Intent(this, AgentOrchestratorService::class.java)
-                .setAction(AgentOrchestratorService.ACTION_ASSIST)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
-            finish()
-            return
-        }
+        // Tapping the icon opens the app (control center / onboarding). The floating pop-up is summoned
+        // ONLY by the assist gesture (power-button hold) → AssistEntryActivity → the orchestrator overlay,
+        // or by the in-app "Ask Clyde" button. The icon never shows just the pop-up.
         setContent { ClydeTheme { ClydeRoot() } }
-    }
-
-    companion object {
-        /** Launcher shortcut / in-app "settings" entry — forces the control center instead of the popup. */
-        const val ACTION_HOME = "dev.kris.clyde.action.HOME"
     }
 }
 
