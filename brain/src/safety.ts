@@ -1,0 +1,128 @@
+// Safe vs consequential, action-bound one-time confirm tokens, hard stops, and a halt flag.
+// Enforcement is centralized in agent.ts `canUseTool` (every tool call passes through it).
+import { createHash } from "node:crypto";
+
+/** Read-only / trivially-reversible tools. Everything NOT here is consequential. */
+const SAFE = new Set<string>([
+  "capabilities", "confirm",
+  // perception + UI driving (gated by hardStop + halt, not by per-action confirm)
+  "ui_dump", "screenshot", "tap", "type_text", "swipe", "global_action",
+  "input_tap", "input_text", "input_key", "uiautomator_dump", "screencap",
+  // benign device reads / trivial output
+  "get_battery", "get_location", "clipboard_set", "notify", "torch", "vibrate",
+  "tts_speak", "read_sensor", "wifi_info", "volume_set",
+  // deterministic, low-risk intents
+  "launch_app", "set_alarm", "set_timer", "navigate_to",
+]);
+
+/** Stable hash of a tool's args (excludes the token) — binds an approval to one concrete call. */
+export function argsHash(args: Record<string, unknown> | undefined): string {
+  const clean: Record<string, unknown> = {};
+  for (const k of Object.keys(args ?? {}).sort()) {
+    if (k === "token") continue;
+    clean[k] = (args as Record<string, unknown>)[k];
+  }
+  return createHash("sha256").update(JSON.stringify(clean)).digest("hex").slice(0, 32);
+}
+
+interface TokenRecord {
+  tool: string;
+  hash: string;
+  exp: number;
+  used: boolean;
+}
+
+export class Safety {
+  private readonly tokens = new Map<string, TokenRecord>();
+  private readonly ownPackage = "dev.kris.clyde";
+  private readonly ttlMs = 75_000; // ~ the app's confirm poll window + margin
+  // Tools whose single-use the APP enforces (it burns the token only after a SUCCESSFUL fire, and
+  // preserves it on a recoverable failure for retry). The brain only VALIDATES these (non-burning).
+  // EVERY other consequential tool runs in-process in the brain with no app round-trip, so the brain
+  // must CONSUME (burn) it here — the default is the secure one.
+  private readonly appEnforced = new Set(["open_url", "share_text", "send_sms", "start_call", "add_calendar_event", "delegate_to_gemini"]);
+
+  /** Does the APP independently burn this tool's token on success? If so the brain validates, not burns. */
+  isAppEnforced(tool: string): boolean {
+    return this.appEnforced.has(tool);
+  }
+
+  classOf(tool: string): "safe" | "consequential" {
+    return SAFE.has(tool) ? "safe" : "consequential";
+  }
+  isConsequential(tool: string): boolean {
+    return !SAFE.has(tool);
+  }
+
+  /** Record an app-issued token, BOUND to the exact tool + args it was approved for. */
+  registerToken(token: string, tool: string, hash: string): void {
+    this.tokens.set(token, { tool, hash, exp: Date.now() + this.ttlMs, used: false });
+  }
+
+  /** One-time consume, bound: the token must match this tool AND these args. */
+  consumeToken(token: string | undefined, tool: string, hash: string): { ok: boolean; error?: string } {
+    if (!token) return { ok: false, error: "missing confirmation token — call confirm({action, params}) first and pass its token." };
+    const rec = this.tokens.get(token);
+    if (!rec) return { ok: false, error: "unknown token — tokens only come from confirm(); never invent one." };
+    if (rec.used) return { ok: false, error: "token already used — call confirm() again for a fresh one." };
+    if (Date.now() > rec.exp) {
+      this.tokens.delete(token);
+      return { ok: false, error: "token expired — call confirm() again." };
+    }
+    if (rec.tool !== tool) return { ok: false, error: `that approval was for ${rec.tool}, not ${tool} — confirm the real action.` };
+    if (rec.hash !== hash) return { ok: false, error: "the action's details changed since approval — confirm() again with the exact values." };
+    rec.used = true;
+    return { ok: true };
+  }
+
+  /** Non-consuming check for the pre-tool gate: same binding as consume, but does NOT burn the token.
+   *  The APP is the authoritative single-use enforcer (it burns only after a SUCCESSFUL fire), so a
+   *  recoverable failure (e.g. a missing permission) can be retried with the same approval instead of
+   *  being wrongly denied because the brain already marked its copy used. */
+  validateToken(token: string | undefined, tool: string, hash: string): { ok: boolean; error?: string } {
+    if (!token) return { ok: false, error: "missing confirmation token — call confirm({action, params}) first and pass its token." };
+    const rec = this.tokens.get(token);
+    if (!rec) return { ok: false, error: "unknown token — tokens only come from confirm(); never invent one." };
+    if (Date.now() > rec.exp) {
+      this.tokens.delete(token);
+      return { ok: false, error: "token expired — call confirm() again." };
+    }
+    if (rec.tool !== tool) return { ok: false, error: `that approval was for ${rec.tool}, not ${tool} — confirm the real action.` };
+    if (rec.hash !== hash) return { ok: false, error: "the action's details changed since approval — confirm() again with the exact values." };
+    return { ok: true };
+  }
+
+  /** Kill switch: drop every outstanding token. */
+  invalidateAll(): void {
+    this.tokens.clear();
+  }
+
+  /** Hard stops that apply even with a valid token. Returns a reason if blocked. */
+  hardStop(tool: string, args: Record<string, unknown>): string | null {
+    const blob = JSON.stringify(args ?? {}).toLowerCase();
+    // Money guard. The REAL backstop is user confirm() on every consequential action; this regex is
+    // only a heuristic tripwire (payment phrasing OR a currency amount next to a move-money verb).
+    // Still scoped to transaction-EXECUTING / egress tools, never perception/navigation.
+    const moneyRe =
+      /\b(confirm payment|send money|transfer (funds|money)|place (an )?order|pay now|wire transfer|make (a )?payment|buy now|checkout|complete (the )?(purchase|order|payment)|venmo|zelle|paypal|cash ?app)\b/;
+    const amountWithVerb = /[$€£₩₹]\s?\d/.test(blob) && /\b(send|transfer|pay|wire|charge|buy|checkout)\b/.test(blob);
+    const moneyTools = new Set(["shell", "su_shell", "open_url", "share_text", "delegate_to_gemini"]);
+    if (moneyTools.has(tool) && (moneyRe.test(blob) || amountWithVerb)) {
+      return "blocked: this looks like a payment or financial action. Clyde never moves money — please do it yourself.";
+    }
+    // Never let Clyde grant ITSELF permissions — enforced tool-AGNOSTICALLY so a generic shell/root
+    // command (`pm grant dev.kris.clyde …`) can't route around the dedicated grant tools.
+    if (blob.includes(this.ownPackage.toLowerCase())) {
+      if (tool === "pm_grant" || tool === "grant_signature_perm") {
+        return "blocked: Clyde will not grant new permissions to itself.";
+      }
+      if (
+        (tool === "shell" || tool === "su_shell" || tool === "inject_event") &&
+        /pm\s+grant|appops\s+set|pm\s+install|grant_runtime_permission/.test(blob)
+      ) {
+        return "blocked: Clyde will not grant new permissions to itself (via shell).";
+      }
+    }
+    return null;
+  }
+}
