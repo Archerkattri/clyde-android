@@ -45,6 +45,9 @@ app/src/main/assets/brain.tgz
 app/src/main/assets/bootstrap-*.zip
 bootstrap/.work/
 
+# generated native libs (node + its .so closure, built from the asset by bootstrap/build-jnilibs.sh)
+app/src/main/jniLibs/
+
 # --- build cache + scratch QA renders (regenerable from scripts/) ---
 .kotlin/
 design/clawd/_*.png

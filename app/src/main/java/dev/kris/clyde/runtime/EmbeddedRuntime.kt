@@ -28,13 +28,16 @@ object EmbeddedRuntime {
 
     fun prefixDir(ctx: Context): File = File(ctx.filesDir, "usr")
     fun homeDir(ctx: Context): File = File(ctx.filesDir, "home")
-    fun nodeBin(ctx: Context): File = File(prefixDir(ctx), "bin/node")
-    // termux-exec 2.x ships its LD_PRELOAD shim as libtermux-exec-ld-preload.so (the 1.x
-    // libtermux-exec.so name is gone). This is the canonical lib Termux itself preloads.
-    fun termuxExecLib(ctx: Context): File = File(prefixDir(ctx), "lib/libtermux-exec-ld-preload.so")
+    // node runs from the app's nativeLibraryDir, NOT app storage: Android's W^X blocks exec'ing a
+    // binary out of files/ at targetSdk 29+ (error=13). nativeLibraryDir is the one exec-allowed spot,
+    // so node + its native .so closure ship via jniLibs (as libnode.so etc.; see app/src/main/jniLibs).
+    fun nativeLibDir(ctx: Context): File = File(ctx.applicationInfo.nativeLibraryDir)
+    fun nodeBin(ctx: Context): File = File(nativeLibDir(ctx), "libnode.so")
+    /** The brain entry (extracted from the asset into app storage; node READS it — reading is fine). */
+    fun brainEntry(ctx: Context): File = File(prefixDir(ctx), "opt/clyde-brain/server.js")
 
-    /** Is the runtime already extracted and runnable? */
-    fun isInstalled(ctx: Context): Boolean = nodeBin(ctx).exists()
+    /** Ready = the asset (brain + CLI + node_modules + libs) is extracted. node itself rides in the APK. */
+    fun isInstalled(ctx: Context): Boolean = brainEntry(ctx).exists()
 
     /** Does THIS build actually bundle a runtime for this device's ABI? (arm64 only.) */
     fun isBundled(ctx: Context): Boolean =
