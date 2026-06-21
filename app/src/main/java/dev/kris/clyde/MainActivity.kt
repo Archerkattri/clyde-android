@@ -1,10 +1,13 @@
 package dev.kris.clyde
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -35,6 +38,13 @@ import dev.kris.clyde.util.Prefs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Draw edge-to-edge with transparent bars, and FORCE dark bar icons (light style): Clyde is
+        // always a light "warm paper" surface, so the status/nav icons must stay dark even if the
+        // system is in dark mode. Each screen pads for the bars/cutout via FitToScreen.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         // Tapping the icon opens the app (control center / onboarding). The floating pop-up is summoned
         // ONLY by the assist gesture (power-button hold) → AssistEntryActivity → the orchestrator overlay,

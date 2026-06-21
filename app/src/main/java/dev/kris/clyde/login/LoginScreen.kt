@@ -31,6 +31,7 @@ import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeLogo
 import dev.kris.clyde.ui.Display
+import dev.kris.clyde.ui.FitToScreen
 import dev.kris.clyde.ui.HeroMark
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
@@ -39,11 +40,11 @@ import dev.kris.clyde.ui.PrimaryButton
 @Composable
 fun LoginScreen(onStartSignIn: () -> Unit) {
     val embedded = EmbeddedRuntime.isBundled(LocalContext.current)
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(14.dp))
@@ -87,7 +88,7 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
             color = ClydeColor.Muted,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(20.dp))
         Text(
             "Signing in on the phone is awkward? You can copy ~/.claude from a desktop where you've already run claude login.",
             fontFamily = Body,
@@ -96,5 +97,6 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
             color = ClydeColor.Muted,
             textAlign = TextAlign.Center,
         )
+    }
     }
 }
