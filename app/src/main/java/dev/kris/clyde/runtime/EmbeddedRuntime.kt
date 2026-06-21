@@ -42,8 +42,14 @@ object EmbeddedRuntime {
 
     // The extracted runtime is ~200 MB; require headroom so we fail fast + clearly when truly low.
     private const val NEEDED_BYTES = 280L * 1024 * 1024
+    private const val EST_TOTAL_BYTES = 214L * 1024 * 1024 // our build extracts to ~214 MB
     fun freeMb(ctx: Context): Long = ctx.filesDir.usableSpace / (1024 * 1024)
     fun lowStorage(ctx: Context): Boolean = ctx.filesDir.usableSpace < NEEDED_BYTES
+
+    /** Live unpack status the setup screen polls. [etaSeconds] < 0 = not yet estimable. */
+    data class Progress(val phase: String, val bytes: Long, val totalBytes: Long, val files: Int, val etaSeconds: Int)
+    @Volatile var progress: Progress? = null; private set
+    @Volatile var lastError: String? = null; private set
 
     /**
      * Extract the bootstrap if missing or if [version] changed. Returns true if the runtime is ready.
@@ -65,6 +71,16 @@ object EmbeddedRuntime {
             return false
         }
 
+        lastError = null
+        val startMs = System.currentTimeMillis()
+        var bytes = 0L
+        var files = 0
+        var phase = "Starting"
+        fun report() {
+            val el = System.currentTimeMillis() - startMs
+            val eta = if (bytes > 0L && el > 1500L) (((EST_TOTAL_BYTES - bytes).coerceAtLeast(0L) * el) / bytes / 1000L).toInt() else -1
+            progress = Progress(phase, bytes, EST_TOTAL_BYTES, files, eta)
+        }
         return runCatching {
             val staging = File(ctx.filesDir, "usr-staging").apply { deleteRecursively(); mkdirs() }
             val stagingCanon = staging.canonicalPath
@@ -78,6 +94,7 @@ object EmbeddedRuntime {
             }
             val symlinks = ArrayList<Pair<String, String>>() // target, linkPath
 
+            phase = "Unpacking files"; report()
             ctx.assets.open(ASSET_ARM64).use { raw ->
                 ZipInputStream(raw.buffered()).use { zin ->
                     var entry = zin.nextEntry
@@ -92,7 +109,9 @@ object EmbeddedRuntime {
                             else -> {
                                 val out = safeChild(name)
                                 out.parentFile?.mkdirs()
-                                out.outputStream().use { zin.copyTo(it) }
+                                out.outputStream().use { bytes += zin.copyTo(it) }
+                                files++
+                                if (files and 0x1F == 0) report() // every 32 files
                                 // executables in the bootstrap need 0700
                                 if (name.startsWith("bin/") || name.startsWith("libexec/") || name == "lib/apt/apt-helper") {
                                     runCatching { Os.chmod(out.absolutePath, 448) }.onFailure { Log.w(TAG, "chmod failed: $name", it) } // 0o700
@@ -105,20 +124,29 @@ object EmbeddedRuntime {
                 }
             }
 
+            phase = "Linking commands"; report()
+            var li = 0
             for ((target, linkPath) in symlinks) {
                 val link = safeChild(linkPath)
                 link.parentFile?.mkdirs()
                 runCatching { link.delete(); Os.symlink(target, link.absolutePath) }.onFailure { Log.w(TAG, "symlink failed: $linkPath ← $target", it) }
+                if (++li and 0xFF == 0) report()
             }
 
+            phase = "Finishing"; report()
             prefix.deleteRecursively()
-            check(staging.renameTo(prefix)) { "staging → prefix rename failed" }
+            // Os.rename is a direct rename(2) syscall — more reliable than File.renameTo (which fails
+            // opaquely on Android) and throws an ErrnoException with the real reason if it does fail.
+            Os.rename(staging.absolutePath, prefix.absolutePath)
             homeDir(ctx).mkdirs()
             versionFile.writeText(version)
+            bytes = EST_TOTAL_BYTES; phase = "Ready"; report()
             Log.i(TAG, "embedded runtime installed ($version)")
             true
         }.getOrElse {
-            Log.e(TAG, "embedded runtime install failed", it)
+            lastError = "$phase failed: ${it.javaClass.simpleName}: ${it.message ?: ""}".take(220)
+            progress = null
+            Log.e(TAG, "embedded runtime install failed during '$phase'", it)
             false
         }
     }
