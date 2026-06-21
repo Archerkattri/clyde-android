@@ -48,6 +48,7 @@ import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
+import dev.kris.clyde.ui.FitToScreen
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.SecondaryLink
@@ -94,12 +95,11 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         }
     }
 
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             ClawdSceneView(sceneKey = if (online == true) "success" else "working", size = 84.dp)
@@ -191,6 +191,7 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         SecondaryLink("Set this up later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))
     }
+    }
 }
 
 @Composable
@@ -243,12 +244,11 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         }
     }
 
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
         // Clawd reflects the live setup state: working through the runtime, thinking during sign-in,
         // a success hop when all three steps land, an error wobble if unpack/brain fails.
@@ -381,6 +381,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         PrimaryButton("Continue", onClick = onConnected, enabled = online == true && signedIn)
         SecondaryLink("Finish setup later", onClick = onSkip)
         Spacer(Modifier.height(8.dp))
+    }
     }
 }
 

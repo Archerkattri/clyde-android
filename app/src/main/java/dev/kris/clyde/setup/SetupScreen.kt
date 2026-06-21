@@ -52,6 +52,7 @@ import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
+import dev.kris.clyde.ui.FitToScreen
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.SecondaryLink
@@ -79,9 +80,9 @@ fun SetupScreen(onDone: () -> Unit) {
     }
     val c = caps
     if (c == null) {
+        FitToScreen {
         Column(
-            modifier = Modifier.fillMaxSize().background(ClydeColor.Paper).padding(horizontal = 22.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             ClawdSceneView(sceneKey = "searching", size = 88.dp)
@@ -89,6 +90,7 @@ fun SetupScreen(onDone: () -> Unit) {
             Eyebrow("setup")
             Spacer(Modifier.height(8.dp))
             Text("Detecting your phone…", fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Muted)
+        }
         }
         return
     }
@@ -101,11 +103,11 @@ private fun SetupContent(caps: Caps, onDone: () -> Unit) {
     val auto = caps.root || caps.customRom
     var step by remember { mutableStateOf(if (auto) SetupStep.Branch else SetupStep.Chooser) }
 
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             ClawdSceneView(
@@ -133,6 +135,7 @@ private fun SetupContent(caps: Caps, onDone: () -> Unit) {
             )
             SetupStep.Grants -> GrantsView(onFinish = onDone)
         }
+    }
     }
 }
 
@@ -172,7 +175,7 @@ private fun ColumnScope.GrantsView(onFinish: () -> Unit) {
     GrantRow("App permissions", "mic, calls, texts, calendar, location", done = permsGranted) { permLauncher.launch(RUNTIME_PERMS) }
     GrantRow("Draw over apps", "for the summon overlay", done = overlayOn) { requestOverlay(ctx) }
     GrantRow("Accessibility", "to see & tap the screen", done = accessibilityOn) { openAccessibility(ctx) }
-    Spacer(Modifier.weight(1f))
+    Spacer(Modifier.height(16.dp))
     val allDone = assistantOn && permsGranted && overlayOn && accessibilityOn
     PrimaryButton(if (allDone) "All set — open Clyde" else "Finish setup", onClick = onFinish)
 }
@@ -236,7 +239,7 @@ private fun ColumnScope.AutoConfigView(romName: String, rooted: Boolean, onConfi
         "No ADB pairing needed on this phone. You'll grant a few permissions on the next screen — Android asks for each one as you tap Grant.",
         fontFamily = Body, fontSize = 14.sp, lineHeight = 21.sp, color = ClydeColor.Muted,
     )
-    Spacer(Modifier.weight(1f))
+    Spacer(Modifier.height(16.dp))
     PrimaryButton("Continue to permissions", onClick = onConfigure)
     SecondaryLink("Set it up manually instead", onClick = onManual)
 }
@@ -293,7 +296,7 @@ private fun ColumnScope.PairingView(onOpenWirelessDebugging: () -> Unit, onDone:
         Spacer(Modifier.height(4.dp))
         Text("Settings → Developer options → Wireless debugging → Pair device with code", fontFamily = Mono, fontSize = 11.5f.sp, lineHeight = 17.sp, color = ClydeColor.Ink)
     }
-    Spacer(Modifier.weight(1f))
+    Spacer(Modifier.height(16.dp))
     PrimaryButton("Open wireless debugging", onClick = onOpenWirelessDebugging)
     // Honest: this only advances; the next screen re-probes the REAL Shizuku/ADB capability.
     SecondaryLink("I've paired — continue", onClick = onDone)

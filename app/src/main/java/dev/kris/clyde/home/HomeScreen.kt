@@ -53,6 +53,7 @@ import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeLogo
 import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
+import dev.kris.clyde.ui.FitToScreen
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.pressable
@@ -73,11 +74,11 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
 
     LaunchedEffect(Unit) { online = BrainClient.healthz() }
 
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Clawd is the live status face: calm idle when the brain is online, a little down when
@@ -204,7 +205,7 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
         )
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(18.dp))
         PrimaryButton("Ask Clyde", onClick = onAsk)
         Spacer(Modifier.height(12.dp))
 
@@ -241,6 +242,7 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
                 .padding(vertical = 13.dp),
             contentAlignment = Alignment.Center,
         ) { Text("Stop Clyde · revoke tokens", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Danger) }
+    }
     }
 }
 

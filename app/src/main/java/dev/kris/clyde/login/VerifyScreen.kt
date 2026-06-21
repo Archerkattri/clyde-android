@@ -37,6 +37,7 @@ import dev.kris.clyde.ui.CheckState
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.Display
 import dev.kris.clyde.ui.Eyebrow
+import dev.kris.clyde.ui.FitToScreen
 import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.pressable
@@ -80,11 +81,11 @@ fun VerifyScreen(onContinue: () -> Unit) {
     }
     val verified = brainState == CheckState.Ok && subState == CheckState.Ok && keyState == CheckState.Ok
 
+    FitToScreen {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(ClydeColor.Paper)
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
         val scene = when {
             verified -> "success"
@@ -139,7 +140,7 @@ fun VerifyScreen(onContinue: () -> Unit) {
         CheckRow(subState, "Signed in on a subscription", when { subState == CheckState.Ok -> auth?.plan ?: "subscription"; subState == CheckState.Fail -> if (embedded) "sign in again" else "sign in in Termux"; timedOut -> "not yet"; else -> "checking…" })
         CheckRow(keyState, "No API key set", when { keyState == CheckState.Ok -> "clean"; keyState == CheckState.Fail -> "remove API key"; else -> "checking…" })
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(16.dp))
         if (timedOut && !verified) {
             Text(
                 if (embedded) "Couldn't confirm yet. Make sure sign-in finished and the brain is running, then check again."
@@ -158,6 +159,7 @@ fun VerifyScreen(onContinue: () -> Unit) {
             )
         }
         PrimaryButton("Continue", onClick = onContinue, enabled = verified)
+    }
     }
 }
 
