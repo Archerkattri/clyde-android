@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.overlay.ClawdSceneView
+import dev.kris.clyde.runtime.BrainRunner
 import dev.kris.clyde.runtime.ClaudeAuth
 import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -208,6 +209,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var brainError by remember { mutableStateOf(false) }
     var lowStorage by remember { mutableStateOf(false) }
     var progressState by remember { mutableStateOf<EmbeddedRuntime.Progress?>(null) }
+    var brainDiag by remember { mutableStateOf("") }
     var attempt by remember { mutableStateOf(0) }
 
     // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real
@@ -224,6 +226,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
             progressState = EmbeddedRuntime.progress
+            brainDiag = BrainRunner.diag
             online = BrainClient.healthz()
             if (auth.isSignedIn()) signedIn = true
             // brain is authoritative for the loopback sign-in: detect completion + surface any error
@@ -366,6 +369,14 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 Text("The brain didn't start. Tap Try again; if it keeps failing, reopen Clyde.", fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep)
             } else {
                 Text(if (online == true) "Running on 127.0.0.1:8765." else "Starting the brain…", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+            }
+            // Live bring-up diagnostics — what the brain process actually printed (or why it wouldn't
+            // launch). Shown until it's online so a failure isn't a silent spinner. Safe to screenshot.
+            if (online != true && brainDiag.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text("diagnostics", fontFamily = Mono, fontSize = 9.sp, color = ClydeColor.Muted)
+                Spacer(Modifier.height(3.dp))
+                Text(brainDiag, fontFamily = Mono, fontSize = 9.5f.sp, lineHeight = 13.sp, color = ClydeColor.TerracottaDeep)
             }
         }
         Spacer(Modifier.height(18.dp))
