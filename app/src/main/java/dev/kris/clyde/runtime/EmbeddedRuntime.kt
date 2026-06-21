@@ -40,6 +40,11 @@ object EmbeddedRuntime {
     fun isBundled(ctx: Context): Boolean =
         runCatching { ctx.assets.open(ASSET_ARM64).close(); true }.getOrDefault(false)
 
+    // The extracted runtime is ~200 MB; require headroom so we fail fast + clearly when truly low.
+    private const val NEEDED_BYTES = 280L * 1024 * 1024
+    fun freeMb(ctx: Context): Long = ctx.filesDir.usableSpace / (1024 * 1024)
+    fun lowStorage(ctx: Context): Boolean = ctx.filesDir.usableSpace < NEEDED_BYTES
+
     /**
      * Extract the bootstrap if missing or if [version] changed. Returns true if the runtime is ready.
      * Safe to call repeatedly; the extraction is atomic (staging dir → rename).
@@ -53,6 +58,12 @@ object EmbeddedRuntime {
         val prefix = prefixDir(ctx)
         val versionFile = File(ctx.filesDir, VERSION_FILE)
         if (isInstalled(ctx) && runCatching { versionFile.readText() }.getOrNull() == version) return true
+
+        // Fail fast + loud when genuinely out of space, instead of dying mid-extract with a vague error.
+        if (lowStorage(ctx)) {
+            Log.e(TAG, "low storage: ${freeMb(ctx)} MB free, need ~${NEEDED_BYTES / (1024 * 1024)} MB to unpack the runtime")
+            return false
+        }
 
         return runCatching {
             val staging = File(ctx.filesDir, "usr-staging").apply { deleteRecursively(); mkdirs() }
