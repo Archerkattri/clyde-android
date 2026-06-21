@@ -4,7 +4,7 @@ This produces `app/src/main/assets/bootstrap-aarch64.zip`: a **Termux-style Linu
 specifically for the `dev.kris.clyde` prefix**, containing only what Clyde's brain needs:
 
 - **Node.js** (from `nodejs-lts`)
-- **`termux-exec`** (`libtermux-exec.so`) — the W^X workaround so Android lets us `exec` Node
+- **`termux-exec`** (`libtermux-exec-ld-preload.so`, termux-exec 2.x) — the W^X workaround so Android lets us `exec` Node
 - the **JS `claude-code` CLI** (`@anthropic-ai/claude-code@2.1.112`, the last pure-JS release — the
   newer native binaries are glibc-only and won't run on Android)
 - the **brain**, esbuild-bundled to a single `server.js` (no `tsx`/esbuild needed on device)

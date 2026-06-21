@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.overlay.ClawdSceneView
+import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -129,6 +130,9 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
         CapabilityRow("Type, install, change settings", if (shizukuOn) "on" else "off", live = shizukuOn, on = shizukuOn)
         CapabilityRow("Unrestricted (root)", if (rootOn) "on" else "off", live = rootOn, on = rootOn)
 
+        // The Termux brain-key card is only meaningful on the COMPANION build; the embedded build
+        // passes the key to the in-app brain via env, so hide it there (no Termux to sync to).
+        if (!EmbeddedRuntime.isBundled(ctx)) {
         Spacer(Modifier.height(16.dp))
         Eyebrow("brain key")
         Spacer(Modifier.height(6.dp))
@@ -168,6 +172,7 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
                 }.padding(8.dp),
             )
         }
+        } // end: brain-key card (companion build only)
 
         Spacer(Modifier.height(16.dp))
         Eyebrow("assistant model")

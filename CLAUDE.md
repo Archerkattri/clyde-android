@@ -24,7 +24,7 @@ F-Droid, no manual paste. NOT Google-Play-distributable (W^X exec + bundled GPL 
   CLI baked in. Output `app/src/main/assets/bootstrap-aarch64.zip` (gitignored; ~110–125 MB; arm64 only).
 - App side is **clean-room** (no Termux GPLv3 code → Clyde stays license-flexible; see `NOTICE.md`):
   `runtime/EmbeddedRuntime.kt` extracts the bootstrap on first run; `runtime/BrainRunner.kt` runs `node`
-  under `AgentOrchestratorService` with `LD_PRELOAD=libtermux-exec.so` (the W^X workaround). Both GUARDED
+  under `AgentOrchestratorService` with `LD_PRELOAD=libtermux-exec-ld-preload.so` (the W^X workaround). Both GUARDED
   on `EmbeddedRuntime.isBundled()` so builds without the asset keep the external-Termux path working.
 - Brain: `CLAUDE_CLI_PATH` points the SDK at the bundled JS CLI. The native CLI is glibc-only — pin the
   JS release (claude-code 2.1.112). `CLAUDE_CODE_OAUTH_TOKEN` is the SUBSCRIPTION headless token (allowed).

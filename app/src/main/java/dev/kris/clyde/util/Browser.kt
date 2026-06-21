@@ -8,8 +8,8 @@ import android.net.Uri
 /** Opening login/OAuth URLs in the user's REAL default browser. */
 object Browser {
     /**
-     * Open [url] in the user's default browser. OAuth sign-in (claude login / codex login) must land in
-     * a full browser, not an in-app webview or a non-browser app that registered for the auth domain —
+     * Open [url] in the user's default browser. OAuth sign-in (e.g. claude login) must land in a full
+     * browser, not an in-app webview or a non-browser app that registered for the auth domain —
      * so we resolve the default browser via a neutral http probe and target it explicitly. The headless
      * CLI can't open a browser itself in the embedded runtime; it prints the URL and the app opens it.
      */

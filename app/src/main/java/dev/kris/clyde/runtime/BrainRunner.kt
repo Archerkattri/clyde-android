@@ -39,8 +39,21 @@ class BrainRunner(private val ctx: Context) {
         stopped = false
         supervisor = thread(name = "clyde-brain-supervisor", isDaemon = true) {
             var backoffMs = 1000L
+            var startFailures = 0
             while (!stopped) {
-                if (!launchOnce(clydeKey)) break
+                if (!launchOnce(clydeKey)) {
+                    // A start failure is usually transient (e.g. brief FS contention right after the
+                    // first-run extraction). Back off and retry instead of killing the brain for the
+                    // whole session — but give up after a few in a row so a genuinely broken binary
+                    // can't spin forever.
+                    if (++startFailures >= 5) { Log.e(tag, "brain failed to start ${startFailures}x; giving up this session"); break }
+                    if (stopped) break
+                    Log.w(tag, "brain start failed (#$startFailures); retrying in ${backoffMs}ms")
+                    runCatching { Thread.sleep(backoffMs) }
+                    backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
+                    continue
+                }
+                startFailures = 0
                 val code = runCatching { proc?.waitFor() }.getOrNull()
                 if (stopped) break
                 Log.w(tag, "brain exited (code=$code); restarting in ${backoffMs}ms")
