@@ -298,6 +298,7 @@ private val SCENES: Map<String, ClawScene> = mapOf(
     "warning" to ClawScene(eye = "wide", brow = "v", clawL = cp(raise = 0.6f, center = 3.5f, vertical = true), effect = "exclamation", motion = "idle-bob", warn = true),
     "confused" to ClawScene(eye = "side", clawR = cp(raise = 1.6f, center = 5.0f, open = 0.3f), effect = "question-mark", motion = "shake-head"),
     "idea" to ClawScene(eye = "star", mouth = "grin", clawR = cp(raise = 1.8f, tip = true), effect = "lightbulb", motion = "hop"),
+    "pointing" to ClawScene(eye = "wide", clawR = cp(raise = -0.5f, reach = 1.7f, tip = true), clawL = cp(raise = 0.2f), motion = "idle-bob"),
     "sleeping" to ClawScene(eye = "closed", clawL = cp(raise = -0.3f), clawR = cp(raise = -0.3f), effect = "zzz", motion = "idle-bob"),
     "cold" to ClawScene(eye = "squint", props = listOf("sun"), effect = "shiver-lines", motion = "wobble"),
     "sad" to ClawScene(eye = "half", mouth = "frown", brow = "up", effect = "tear-pixel", motion = "idle-bob"),

@@ -5,7 +5,9 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -110,6 +112,8 @@ class OverlayController(private val appCtx: Context) :
     private val main = Handler(Looper.getMainLooper())
     private val wm = appCtx.getSystemService(WindowManager::class.java)
     private var view: ComposeView? = null
+    private var pointerView: ComposeView? = null
+    private val clearPointer = Runnable { detachPointer() }
     private val ui = mutableStateOf(OverlayUi())
     private val confirmResult = ArrayBlockingQueue<Pair<Boolean, String?>>(1)
     private val confirmPending = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -183,7 +187,40 @@ class OverlayController(private val appCtx: Context) :
         attach()
         main.postDelayed(settle, 2200)
     }
-    fun hide() = onMain { main.removeCallbacks(settle); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
+    fun hide() = onMain { main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
+
+    /** Briefly show a pointing Clawd at SCREEN pixel (x,y) — the spot Clyde is about to tap — so device
+     *  automation is visible/auditable (a Gemini-can't). NOT_TOUCHABLE, so it never intercepts the tap. */
+    fun pointAt(xPx: Int, yPx: Int) = onMain {
+        if (!Settings.canDrawOverlays(appCtx)) return@onMain
+        main.removeCallbacks(clearPointer)
+        detachPointer()
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        val cv = ComposeView(appCtx)
+        cv.setViewTreeLifecycleOwner(this)
+        cv.setViewTreeViewModelStoreOwner(this)
+        cv.setViewTreeSavedStateRegistryOwner(this)
+        cv.setContent { ClydeTheme { ClawdSceneView(sceneKey = "pointing", size = 54.dp) } }
+        val box = (66 * appCtx.resources.displayMetrics.density).toInt()
+        val params = WindowManager.LayoutParams(
+            box, box,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        )
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = xPx - box / 2
+        params.y = yPx - box // Clawd sits just above the point, claw reaching down to it
+        runCatching { wm.addView(cv, params); pointerView = cv }
+        main.postDelayed(clearPointer, 850)
+    }
+
+    private fun detachPointer() {
+        pointerView?.let { runCatching { wm.removeView(it) } }
+        pointerView = null
+    }
 
     /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies.
      *  Serialized: a second concurrent confirm is denied so a token never flows to the wrong waiter. */
@@ -302,6 +339,8 @@ class OverlayController(private val appCtx: Context) :
 
     fun destroy() {
         cancelPendingConfirm() // release any worker parked in confirmBlocking() before tearing down
+        main.removeCallbacks(clearPointer)
+        detachPointer()
         detach()
         clearIssuedTokens()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
