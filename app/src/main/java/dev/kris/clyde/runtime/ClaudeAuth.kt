@@ -92,9 +92,10 @@ class ClaudeAuth(private val ctx: Context) {
         runCatching { stdin?.apply { write(text); write("\n"); flush() } }
     }
 
-    /** True once the brain's home holds Claude credentials (i.e. sign-in completed). */
+    /** True once a subscription token is pasted, or the brain's home holds Claude credentials. */
     fun isSignedIn(): Boolean =
-        File(home, ".claude/.credentials.json").exists() || File(home, ".claude.json").exists()
+        dev.kris.clyde.util.Prefs.oauthToken.isNotBlank() ||
+            File(home, ".claude/.credentials.json").exists() || File(home, ".claude.json").exists()
 
     @Synchronized
     fun cancel() {
