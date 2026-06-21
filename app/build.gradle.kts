@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.bundling.Tar
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -19,6 +20,11 @@ val bundleBrain by tasks.registering(Tar::class) {
 }
 tasks.named("preBuild") { dependsOn(bundleBrain) }
 
+// Release signing: read app/keystore.properties if present (gitignored). Generate your own keystore
+// and point this file at it for distribution; without it, release stays unsigned (CI/dev still builds).
+val keystorePropsFile = project.file("keystore.properties")
+val keystoreProps = Properties().apply { if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) } }
+
 android {
     namespace = "dev.kris.clyde"
     compileSdk = 36
@@ -30,6 +36,17 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -44,6 +61,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropsFile.exists()) signingConfig = signingConfigs.getByName("release")
         }
     }
 
