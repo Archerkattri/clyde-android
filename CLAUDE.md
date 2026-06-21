@@ -91,10 +91,22 @@ Built with the **frontend-design** skill. Distinctive, authentic-Claude, anti-AI
 - [x] P3 Tier 1 accessibility (PhoneControlAccessibilityService + a11y endpoints/tools)
 - [x] P4 Model A streaming (BrainClient.query NDJSON) + Tier 2 (brain rish tools; Shizuku detect)
 - [x] P5 router + summon overlay + Clawd; Tier 3 brain tools (su)
-- App builds: `gradle :app:assembleDebug` → app-debug.apk. Login → verify → setup → home → assist.
-- TODO on device: run the brain in Termux (`claude login`), grant overlay/accessibility, Shizuku
-  re-arm; multi-step UI automation is ~40-70% (supervised). Status-chip/minimized-FAB is folded
-  into the summon overlay for now.
+- [x] P6 production hardening: security audit 23/28 fixed (loopback key now AES-256/GCM-encrypted
+  under a TEE Keystore key, #15); **release signing pipeline** (keystore.properties → signed
+  app-release.apk, V2 scheme, verified; covers #24). Remaining #18/#27 accepted, #4 deferred
+  (embedded path passes the key via env, clean). brain typecheck + 50+ tests green.
+- [x] P7 Clawd SCENE engine: design bench renders all 194 catalog scenarios (claw 98 / effect 95 /
+  prop 91 / mouth 100%); ported to the live app (`overlay/ClawdScene.kt`) and wired into the overlay
+  (`overlayScene` maps the brain's status → a composed scene for activities the 6 hero states don't
+  cover). Render primitives are 1:1 with the bench; fine pixel offsets may want on-device tuning.
+- App builds: `gradle :app:assembleDebug` → app-debug.apk; `:app:assembleRelease` → signed
+  app-release.apk (3.1 MB, R8). Login → verify → setup → home → assist.
+- TODO on device (hardware-gated): run the brain in Termux (`claude login`), grant overlay/
+  accessibility, Shizuku re-arm; multi-step UI automation is ~40-70% (supervised); confirm scene
+  visual fit on a real screen. Status-chip/minimized-FAB is folded into the summon overlay for now.
+- Embedded runtime: bootstrap (Node/V8 from source) building in WSL; deps done, Node compile is the
+  long pole — resume with `CLYDE_SKIP_CLEAN=1`, log at `build-bootstrap.log`. Termux companion is the
+  working fallback until the asset lands.
 
 ## Out of scope (don't attempt in the app)
 - `BIND_VOICE_INTERACTION` / true always-on hotword / `CAPTURE_AUDIO_HOTWORD` — need platform signing / custom ROM. Use the assist gesture; leave seams only.
