@@ -12,8 +12,8 @@ import kotlin.concurrent.thread
  * never touch a PTY/JNI, so this is all that's needed.
  *
  * The W^X catch: targetSdk 36 / Android 10+ forbid exec'ing binaries from app-private storage. The
- * bootstrap ships libtermux-exec.so, which (via LD_PRELOAD) routes execve through the system linker —
- * the supported workaround. node is launched with that preload.
+ * bootstrap ships libtermux-exec-ld-preload.so (termux-exec 2.x), which (via LD_PRELOAD) routes execve
+ * through the system linker — the supported workaround. node is launched with that preload.
  */
 class BrainRunner(private val ctx: Context) {
     private val tag = "ClydeRuntime"

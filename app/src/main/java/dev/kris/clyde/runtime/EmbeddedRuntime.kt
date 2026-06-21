@@ -29,7 +29,9 @@ object EmbeddedRuntime {
     fun prefixDir(ctx: Context): File = File(ctx.filesDir, "usr")
     fun homeDir(ctx: Context): File = File(ctx.filesDir, "home")
     fun nodeBin(ctx: Context): File = File(prefixDir(ctx), "bin/node")
-    fun termuxExecLib(ctx: Context): File = File(prefixDir(ctx), "lib/libtermux-exec.so")
+    // termux-exec 2.x ships its LD_PRELOAD shim as libtermux-exec-ld-preload.so (the 1.x
+    // libtermux-exec.so name is gone). This is the canonical lib Termux itself preloads.
+    fun termuxExecLib(ctx: Context): File = File(prefixDir(ctx), "lib/libtermux-exec-ld-preload.so")
 
     /** Is the runtime already extracted and runnable? */
     fun isInstalled(ctx: Context): Boolean = nodeBin(ctx).exists()
