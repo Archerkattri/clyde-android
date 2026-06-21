@@ -116,7 +116,9 @@ class AgentOrchestratorService : Service() {
     private fun handle(text: String) {
         overlay.status("Thinking…")
         scope.launch {
-            BrainClient.query(text, sessionId, Prefs.assistantModel) { ev ->
+            val backend = Prefs.backend
+            val model = if (backend == "codex") Prefs.codexModel else Prefs.assistantModel
+            BrainClient.query(text, sessionId, model, backend) { ev ->
                 when (ev.optString("type")) {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })

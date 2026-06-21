@@ -25,6 +25,8 @@ object Prefs {
     private const val KEY_CLYDE_LEGACY = "clyde_key"   // old plaintext — migrated then removed
     private const val KEY_SIGNED_IN = "signed_in"
     private const val KEY_MODEL = "assistant_model"
+    private const val KEY_BACKEND = "assistant_backend"
+    private const val KEY_CODEX_MODEL = "codex_model"
     private const val KS_ALIAS = "clyde_prefs_aeskey"
     private const val ANDROID_KS = "AndroidKeyStore"
 
@@ -53,10 +55,20 @@ object Prefs {
         get() = sp.getBoolean(KEY_SIGNED_IN, false)
         set(value) = sp.edit().putBoolean(KEY_SIGNED_IN, value).apply()
 
-    /** Assistant model the brain should use: "opus" | "sonnet" | "haiku". Default sonnet (balanced). */
+    /** Claude model: "opus" | "sonnet" | "haiku". Default sonnet (balanced). */
     var assistantModel: String
         get() = sp.getString(KEY_MODEL, "sonnet") ?: "sonnet"
         set(value) = sp.edit().putString(KEY_MODEL, value).apply()
+
+    /** Brain backend: "claude" (Agent SDK) or "codex" (OpenAI Codex CLI, ChatGPT subscription). */
+    var backend: String
+        get() = sp.getString(KEY_BACKEND, "claude") ?: "claude"
+        set(value) = sp.edit().putString(KEY_BACKEND, value).apply()
+
+    /** Codex model when backend == "codex": gpt-5.4 | gpt-5.4-mini | gpt-5.3-codex. */
+    var codexModel: String
+        get() = sp.getString(KEY_CODEX_MODEL, "gpt-5.4") ?: "gpt-5.4"
+        set(value) = sp.edit().putString(KEY_CODEX_MODEL, value).apply()
 
     private fun store(value: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

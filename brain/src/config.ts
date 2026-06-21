@@ -50,6 +50,16 @@ export function apiKeyPresent(): boolean {
   return OVERRIDE_CREDS.some((k) => (process.env[k] ?? "").trim() !== "");
 }
 
+// Codex (OpenAI) must also run on the ChatGPT SUBSCRIPTION (codex login), never a paid API key.
+// CODEX_API_KEY / OPENAI_API_KEY would bill per token; OPENAI_BASE_URL would redirect off the
+// subscription endpoint. (Codex's own ChatGPT OAuth creds live in ~/.codex/auth.json — allowed.)
+const CODEX_OVERRIDE_CREDS = ["OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL"];
+
+/** Every way the env would bill a Codex turn OFF the ChatGPT subscription (checked per codex turn). */
+export function codexOffSubscriptionReasons(): string[] {
+  return CODEX_OVERRIDE_CREDS.filter((k) => (process.env[k] ?? "").trim() !== "");
+}
+
 /** Every way the env is currently configured to bill OFF the subscription (for /auth/status truth). */
 export function offSubscriptionReasons(): string[] {
   const reasons = OVERRIDE_CREDS.filter((k) => (process.env[k] ?? "").trim() !== "");
@@ -100,6 +110,12 @@ export const config = {
   rishCmd: process.env.RISH_CMD ?? "rish",
   suCmd: process.env.SU_CMD ?? "su",
   model: process.env.CLYDE_MODEL && process.env.CLYDE_MODEL.trim() !== "" ? process.env.CLYDE_MODEL : undefined,
+  // Which brain backend serves a turn by default: "claude" (Agent SDK) or "codex" (OpenAI Codex CLI).
+  // The app can override per-query; this is the fallback.
+  backend: ((process.env.CLYDE_BACKEND ?? "claude").trim().toLowerCase() === "codex" ? "codex" : "claude") as "claude" | "codex",
+  // Path to the codex binary (bootstrap sets this on the embedded runtime); else found on PATH.
+  codexCliPath: process.env.CODEX_CLI_PATH && process.env.CODEX_CLI_PATH.trim() !== "" ? process.env.CODEX_CLI_PATH : undefined,
+  codexModel: process.env.CODEX_MODEL && process.env.CODEX_MODEL.trim() !== "" ? process.env.CODEX_MODEL : undefined,
   // Explicit path to the JS claude-code CLI (cli.js). The embedded runtime sets this to the bundled
   // copy; unset on a normal Termux install (SDK finds `claude` on PATH). The native CLI is glibc-only.
   claudeCliPath: process.env.CLAUDE_CLI_PATH && process.env.CLAUDE_CLI_PATH.trim() !== "" ? process.env.CLAUDE_CLI_PATH : undefined,
