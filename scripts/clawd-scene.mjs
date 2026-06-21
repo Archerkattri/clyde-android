@@ -125,6 +125,16 @@ const PROPS = {
   compass: (cv) => { const x = PX(-1), y = PY(9.5); cv.odisc(x, y, CELL * 1.8, hx("#FAF6EC"), STEELD); cv.line(x, y, x, y - CELL * 1.3, TER, CELL * 0.4); cv.line(x, y, x, y + CELL * 1.3, SKIN_BLUE.s, CELL * 0.4); },
   battery: (cv) => { cv.rect(PX(-2), PY(9), CELL * 4, CELL * 2, hx("#FAF6EC")); cv.rect(PX(2), PY(9.5), CELL * 0.5, CELL, GRAY); cv.rect(PX(-1.7), PY(9.3), CELL * 2.4, CELL * 1.4, GRN); },
   lock: (cv) => { const x = PX(-1), y = PY(10); cv.rect(x - CELL * 1.2, y, CELL * 2.4, CELL * 2, GOLD); cv.arc(x, y, CELL * 0.9, Math.PI, TAU, GOLDS, CELL * 0.4); cv.disc(x, y + CELL, CELL * 0.3, GOLDS); },
+  calculator: (cv) => { cv.rect(PX(-2), PY(8), CELL * 4, CELL * 4.5, hx("#2A2622")); cv.rect(PX(-1.6), PY(8.4), CELL * 3.2, CELL, GRN); for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) cv.rect(PX(-1.5 + c * 1.2), PY(10 + r * 1.2), CELL * 0.8, CELL * 0.8, GRAY); },
+  gear: (cv) => { const x = PX(-1), y = PY(4); cv.odisc(x, y, CELL * 1.4, STEEL, STEELD); cv.disc(x, y, CELL * 0.5, hx("#FAF9F5")); for (let k = 0; k < 8; k++) { const t = k / 8 * TAU; cv.rect(x + Math.cos(t) * CELL * 1.7 - 1.5, y + Math.sin(t) * CELL * 1.7 - 1.5, 3, 3, STEELD); } },
+  trashcan: (cv) => { cv.rect(PX(-1.5), PY(8.5), CELL * 3, CELL * 3.2, GRAY); cv.rect(PX(-1.8), PY(8), CELL * 3.6, CELL * 0.7, STEELD); for (let i = 0; i < 2; i++) cv.rect(PX(-0.8 + i * 1.2), PY(9), CELL * 0.3, CELL * 2.2, STEELD); },
+  shoppingbag: (cv) => { cv.rect(PX(-1.5), PY(9), CELL * 3, CELL * 3, TER); cv.arc(PX(0), PY(9), CELL * 0.9, Math.PI, TAU, hx("#8A4B33"), CELL * 0.35); },
+  sun: (cv) => { cv.disc(PX(15.5), PY(2), CELL * 1.2, GOLD); for (let k = 0; k < 8; k++) { const t = k / 8 * TAU; cv.line(PX(15.5) + Math.cos(t) * CELL * 1.7, PY(2) + Math.sin(t) * CELL * 1.7, PX(15.5) + Math.cos(t) * CELL * 2.4, PY(2) + Math.sin(t) * CELL * 2.4, GOLD, CELL * 0.3); } },
+  cloud: (cv) => { [[14, 2, 1.1], [16, 1.6, 1.4], [18, 2.2, 1.0]].forEach(([x, y, r]) => cv.disc(PX(x), PY(y), CELL * r, GRAY)); },
+  umbrella: (cv) => { const x = PX(9.5), y = PY(-1); cv.arc(x, y + CELL * 2, CELL * 3, Math.PI, TAU, TER, CELL * 0.7); cv.line(x, y + CELL * 2, x, y + CELL * 4, STEELD, CELL * 0.3); },
+  snowflake: (cv) => { const x = PX(15.5), y = PY(2); for (let k = 0; k < 6; k++) { const t = k / 6 * TAU; cv.line(x, y, x + Math.cos(t) * CELL * 1.5, y + Math.sin(t) * CELL * 1.5, hx("#BFE9F5"), CELL * 0.3); } },
+  scarf: (cv, m, tf) => { const [X, Y] = T(tf, 9.5, 12); cv.rect(PX(X) - CELL * 3, PY(Y), CELL * 6, CELL * 0.9, SKIN_BLUE.o); cv.rect(PX(X) + CELL * 1.5, PY(Y), CELL * 0.9, CELL * 2, SKIN_BLUE.o); },
+  bell: (cv) => { const x = PX(-1), y = PY(9); cv.arc(x, y + CELL, CELL * 1.3, Math.PI, TAU, GOLD, CELL * 0.6); cv.rect(x - CELL * 1.3, y + CELL, CELL * 2.6, CELL * 0.5, GOLD); cv.disc(x, y + CELL * 1.8, CELL * 0.4, GOLDS); },
 };
 function ringG(cv, gx, gy, r, c, a0 = 0, a1 = TAU, a = 1) { for (let t = a0; t <= a1; t += 0.13) cv.rect(PX(gx + Math.cos(t) * r - 0.5), PY(gy + Math.sin(t) * r - 0.5), CELL * 0.6, CELL * 0.6, c, a); }
 const EFFECTS = {
@@ -149,6 +159,12 @@ const EFFECTS = {
   "checklist": (cv) => { for (let i = 0; i < 3; i++) { cv.rect(PX(-1.5), PY(8 + i * 1.3), CELL, CELL, hx("#FAF6EC")); cv.rect(PX(0), PY(8.3 + i * 1.3), CELL * 2.5, CELL * 0.5, GRAY); if (i < 2) cv.line(PX(-1.3), PY(8.5 + i * 1.3), PX(-0.5), PY(8.9 + i * 1.3), GRN, CELL * 0.3); } },
   "scan-line": (cv) => cv.rect(PX(3), PY(9), CELL * 14, CELL * 0.5, hx("#9BDCEE"), 0.9),
   ripple: (cv, tf, p) => { for (let i = 0; i < 2; i++) ringG(cv, 9.5, 14, 3 + i * 2 + (p * 3) % 3, SKIN_BLUE.o, 0, TAU, Math.max(0, 0.7 - i * 0.3)); },
+  "stink-lines": (cv) => { let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; for (let i = 0; i < 12; i++) cv.rect(PX(2 + rnd() * 16), PY(6 + rnd() * 5), CELL * 0.4, CELL * 0.4, rnd() > 0.5 ? hx("#FFFFFF") : SKIN_BLUE.e, 0.8); },
+  static: (cv) => EFFECTS["stink-lines"](cv),
+  "camera-flash": (cv) => cv.rect(0, 0, cv.w, cv.h, hx("#FFFFFF"), 0.5),
+  "tear-pixel": (cv) => cv.rect(PX(7), PY(10.5), CELL * 0.7, CELL * 1.4, SKIN_BLUE.o),
+  "shiver-lines": (cv) => { [3, 16].forEach((x) => { cv.rect(PX(x), PY(8), CELL * 0.3, CELL * 1.5, SKIN_BLUE.s, 0.8); cv.rect(PX(x), PY(10), CELL * 0.3, CELL * 1.5, SKIN_BLUE.s, 0.8); }); },
+  rain: (cv) => { for (let i = 0; i < 6; i++) cv.line(PX(2 + i * 2.8), PY(2 + (i % 2) * 1.5), PX(1.6 + i * 2.8), PY(3.5 + (i % 2) * 1.5), SKIN_BLUE.o, CELL * 0.3, 0.8); },
 };
 
 // ── catalog variant → scene spec (parse named parts, graceful fallback) ──
@@ -164,12 +180,15 @@ function variantToScene(v) {
   const eye = findKey(expr, EYE_KEYS) || "dot"; if (findKey(expr, EYE_KEYS)) cov.eye++;
   const mouth = findKey(expr, MOUTH_KEYS) || "flat"; if (findKey(expr, MOUTH_KEYS)) cov.mouth++;
   const brow = findKey(expr, BROW_KEYS) || null;
-  const cp = CLAW_POSES[v.claws] || (v.claws ? null : {}); if (CLAW_POSES[v.claws]) cov.claw++;
+  const clawStr = String(v.claws || "").toLowerCase().replace(/[^a-z]/g, "");
+  const clawKey = clawStr ? Object.keys(CLAW_POSES).find((k) => { const kc = k.replace(/[^a-z]/g, ""); return kc.length >= 4 && clawStr.includes(kc); }) : null;
+  if (clawKey) cov.claw++;
+  const cp = clawKey ? CLAW_POSES[clawKey] : {}; // default to rest so claws always render
   let clawL = {}, clawR = {};
-  if (cp) { const which = cp.side; const base = { ...cp }; delete base.side; delete base.both; if (cp.both || which === "L") clawL = base; if (cp.both || which === "R" || !which) clawR = base; if (which === "L") clawR = {}; if (which === "R") clawL = {}; }
+  { const which = cp.side; const base = { ...cp }; delete base.side; delete base.both; if (cp.both || which === "L") clawL = base; if (cp.both || which === "R" || !which) clawR = base; if (which === "L") clawR = {}; if (which === "R") clawL = {}; }
   const props = (v.props || []).map((p) => { const key = String(p).toLowerCase().replace(/[^a-z]/g, ""); const m = Object.keys(PROPS).find((k) => key.includes(k.replace(/[^a-z]/g, ""))); if (m) cov.prop++; else cov.propMiss.add(p); return m; }).filter(Boolean);
   const accessory = (v.props || []).map((p) => String(p).toLowerCase()).find((p) => /headphone|hard ?hat|helmet|party/.test(p)); const acc = accessory ? (/headphone/.test(accessory) ? "headphones" : /party/.test(accessory) ? "party" : "hardhat") : null;
-  const ek = String(v.effect || "").toLowerCase().split(/[\s(]/)[0].replace(/[^a-z]/g, ""); const effect = ek ? Object.keys(EFFECTS).find((k) => { const kc = k.replace(/[^a-z]/g, ""); return kc === ek || kc.startsWith(ek) || ek.startsWith(kc); }) : null; if (effect) cov.effect++; else if (v.effect && v.effect !== "none") cov.effectMiss.add(v.effect);
+  const estr = String(v.effect || "").toLowerCase().replace(/[^a-z]/g, ""); const effect = estr ? Object.keys(EFFECTS).find((k) => { const kc = k.replace(/[^a-z]/g, ""); return kc.length >= 3 && (estr.includes(kc) || (estr.length >= 4 && kc.includes(estr))); }) : null; if (effect) cov.effect++; else if (v.effect && v.effect !== "none") cov.effectMiss.add(v.effect);
   const motion = (v.motion || "idle-bob").toLowerCase();
   const skin = /error|warn|consequen|block|fail|x-x/.test(expr + " " + (v.caption || "")) ? SKIN_TER : SKIN_BLUE;
   return { eye, mouth, brow, clawL, clawR, accessory: acc, props, effect, motion, skin };
