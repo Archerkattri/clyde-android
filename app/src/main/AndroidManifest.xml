@@ -41,6 +41,12 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
+        <!-- See/resolve the user's default browser so we can open OAuth login URLs there. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
         <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="com.google.android.apps.bard" />
         <package android:name="com.termux" />

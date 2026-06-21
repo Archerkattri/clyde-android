@@ -282,7 +282,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                                 loginActive = true; loginStatus = "starting…"
                                 auth.start(
                                     onLine = { loginStatus = it.trim().take(90) },
-                                    onUrl = { url -> runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                                    onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
                                     onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
                                 )
                             } else if (!runtimeReady) {
