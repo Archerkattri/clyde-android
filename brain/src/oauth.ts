@@ -14,7 +14,9 @@ import { resolve } from "node:path";
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
-const SCOPE = "user:inference user:sessions:claude_code user:mcp_servers";
+// EXACT default scope set the claude-code CLI requests (its AY1 list). The authorize endpoint
+// rejects a different/partial set as "invalid request format", so mirror it verbatim.
+const SCOPE = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 
 const b64url = (b: Buffer): string => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
@@ -75,7 +77,7 @@ async function handleCallback(req: IncomingMessage, res: ServerResponse): Promis
     return;
   }
   try {
-    const tok = await exchange(code, p.verifier, p.redirectUri);
+    const tok = await exchange(code, p.verifier, p.redirectUri, p.state);
     writeCreds(tok);
     page("Signed in to Claude ✓");
   } catch (e) {
@@ -87,8 +89,9 @@ async function handleCallback(req: IncomingMessage, res: ServerResponse): Promis
   }
 }
 
-async function exchange(code: string, verifier: string, redirectUri: string): Promise<Record<string, unknown>> {
-  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier };
+async function exchange(code: string, verifier: string, redirectUri: string, state: string): Promise<Record<string, unknown>> {
+  // Body mirrors the CLI's exchange exactly — note `state` is required alongside the PKCE verifier.
+  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state };
   const r = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
