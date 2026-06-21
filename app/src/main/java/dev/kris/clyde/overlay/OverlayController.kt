@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,9 +45,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -345,13 +351,8 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             .padding(12.dp)
             .graphicsLayer { translationY = (1f - anim) * 60f; alpha = anim },
     ) {
-        // Clawd perched on the top edge — composed scene for recognized activities, else the hero state.
-        val perch = Modifier.align(Alignment.TopCenter).offset(y = (-30).dp)
-        if (ui.scene.isNotBlank()) {
-            ClawdSceneView(sceneKey = ui.scene, size = 58.dp, modifier = perch)
-        } else {
-            ClawdView(state = ui.clawd, size = 58.dp, modifier = perch)
-        }
+        // Clawd free-falls from the device's real camera cutout and lands (with a bounce) on the box edge.
+        ClawdPerch(ui)
         Column(
             Modifier
                 .fillMaxWidth()
@@ -391,6 +392,49 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             }
         }
     }
+}
+
+/** Clawd dropping from the device's real camera cutout onto the box edge. Reads the top-most
+ *  DisplayCutout bounding rect (the punch-hole/notch) for the camera X/Y; free-falls there with a
+ *  spring bounce on first appearance, then rests on the perch as the live scene/state. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.ClawdPerch(ui: OverlayUi) {
+    val view = LocalView.current
+    val reduce = reduceMotion()
+    var rest by remember { mutableStateOf(Offset.Zero) }
+    var camera by remember { mutableStateOf(Offset.Zero) }
+    var placed by remember { mutableStateOf(false) }
+    val drop = remember { Animatable(1f) } // 1 = at the camera, 0 = landed on the perch
+    LaunchedEffect(placed) {
+        if (placed) {
+            if (reduce) drop.snapTo(0f) else drop.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 240f))
+        }
+    }
+    val mod = Modifier
+        .align(Alignment.TopCenter)
+        .offset(y = (-30).dp)
+        .onGloballyPositioned { coords ->
+            rest = coords.positionInWindow()
+            if (!placed) {
+                // insets are settled by layout time — find the camera (top-most cutout rect)
+                val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) view.rootWindowInsets?.displayCutout else null
+                val r = cutout?.boundingRects?.minByOrNull { it.top }
+                camera = if (r != null) Offset(r.exactCenterX(), r.exactCenterY())
+                else Offset((if (view.width > 0) view.width else 1080) / 2f, 0f) // top-center fallback
+                placed = true
+            }
+        }
+        .graphicsLayer {
+            if (placed && drop.value != 0f) {
+                val cx = rest.x + size.width / 2f
+                val cy = rest.y + size.height / 2f
+                translationX = (camera.x - cx) * drop.value
+                translationY = (camera.y - cy) * drop.value
+                rotationZ = -10f * drop.value // a small tumble while falling, settles upright
+            }
+        }
+    if (ui.scene.isNotBlank()) ClawdSceneView(sceneKey = ui.scene, size = 58.dp, modifier = mod)
+    else ClawdView(state = ui.clawd, size = 58.dp, modifier = mod)
 }
 
 @Composable
