@@ -101,9 +101,17 @@ object EmbeddedRuntime {
                     while (entry != null) {
                         val name = entry.name
                         when {
-                            name == "SYMLINKS.txt" -> zin.bufferedReader().forEachLine { line ->
-                                val i = line.indexOf('←') // '←'
-                                if (i > 0) symlinks.add(line.substring(0, i) to line.substring(i + 1))
+                            name == "SYMLINKS.txt" -> {
+                                // Read THIS entry's bytes WITHOUT closing the stream. ZipInputStream.read
+                                // returns -1 at the entry's end, so readBytes() gets exactly SYMLINKS.txt;
+                                // bufferedReader().forEachLine would close `zin` and the next read would
+                                // throw "stream closed", aborting the whole unpack.
+                                val txt = zin.readBytes().toString(Charsets.UTF_8)
+                                for (raw in txt.split('\n')) {
+                                    val line = raw.trimEnd('\r')
+                                    val i = line.indexOf('←') // '←'
+                                    if (i > 0) symlinks.add(line.substring(0, i) to line.substring(i + 1))
+                                }
                             }
                             entry.isDirectory -> safeChild(name).mkdirs()
                             else -> {
