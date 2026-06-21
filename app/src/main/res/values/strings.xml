@@ -2,4 +2,6 @@
     <string name="app_name">Clyde</string>
     <string name="a11y_label">Clyde device control</string>
     <string name="a11y_description">Lets Clyde read the screen and tap, type, and swipe on your behalf — only when you ask it to. This powers Tier-1 device control. You can turn it off here at any time.</string>
+    <string name="shortcut_settings_short">Settings</string>
+    <string name="shortcut_settings_long">Clyde control center</string>
 </resources>

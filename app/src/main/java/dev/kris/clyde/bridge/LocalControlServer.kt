@@ -25,6 +25,8 @@ class LocalControlServer(
     // so a denied permission or failed fire never costs the user a fresh approval.
     private val validateIntentToken: (token: String, action: String, body: JSONObject) -> Boolean,
     private val invalidateIntentToken: (token: String) -> Unit,
+    // Visible automation: flash a pointing Clawd at the screen spot about to be tapped.
+    private val pointAt: (x: Int, y: Int) -> Unit,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
@@ -53,6 +55,10 @@ class LocalControlServer(
                 uri == "/caps" -> ok(caps())
                 uri == "/a11y/dump" -> a11y { it.dumpTree() }
                 uri == "/a11y/tap" -> a11yGuard("tap", { if (body.has("nodeId")) it.nodeText(body.getString("nodeId")) else "" }) {
+                    // Point at the target first (visible, auditable), then a beat, then tap.
+                    val pt = if (body.has("nodeId")) it.nodeCenter(body.getString("nodeId"))
+                    else intArrayOf(body.optInt("x"), body.optInt("y"))
+                    if (pt != null && (pt[0] > 0 || pt[1] > 0)) { pointAt(pt[0], pt[1]); Thread.sleep(320) }
                     if (body.has("nodeId")) it.tapNode(body.getString("nodeId"))
                     else it.tap(body.optInt("x"), body.optInt("y"))
                 }

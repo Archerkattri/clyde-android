@@ -45,6 +45,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.caps.Caps
+import dev.kris.clyde.overlay.ClawdSceneView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.kris.clyde.ui.Body
@@ -83,6 +84,8 @@ fun SetupScreen(onDone: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            ClawdSceneView(sceneKey = "searching", size = 88.dp)
+            Spacer(Modifier.height(12.dp))
             Eyebrow("setup")
             Spacer(Modifier.height(8.dp))
             Text("Detecting your phone…", fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Muted)
@@ -104,6 +107,13 @@ private fun SetupContent(caps: Caps, onDone: () -> Unit) {
             .background(ClydeColor.Paper)
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ClawdSceneView(
+                sceneKey = when (step) { SetupStep.Branch, SetupStep.Chooser -> "thinking"; else -> "working" },
+                size = 78.dp,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
         // Every completion path routes through Grants so permissions/overlay/accessibility are
         // granted one-at-a-time (not all fired at once while the screen navigates away).
         when (step) {

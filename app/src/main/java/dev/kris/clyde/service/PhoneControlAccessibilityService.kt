@@ -108,6 +108,14 @@ class PhoneControlAccessibilityService : AccessibilityService() {
         return !b.isEmpty && tap(b.centerX(), b.centerY())
     }
 
+    /** Screen center of a dumped node's bounds, for the visual "point before tap" cue. */
+    fun nodeCenter(nodeId: String): IntArray? {
+        val node = nodeMap[nodeId] ?: return null
+        node.refresh()
+        val b = Rect().also { node.getBoundsInScreen(it) }
+        return if (b.isEmpty) null else intArrayOf(b.centerX(), b.centerY())
+    }
+
     fun setText(nodeId: String?, text: String): Boolean {
         val node = nodeId?.let { nodeMap[it] }
             ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)

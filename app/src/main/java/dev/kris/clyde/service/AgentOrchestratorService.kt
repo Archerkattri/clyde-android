@@ -75,6 +75,7 @@ class AgentOrchestratorService : Service() {
                 overlayStatus = { text, _ -> overlay.status(text) },
                 validateIntentToken = { token, action, body -> overlay.validateIssuedToken(token, action, body) },
                 invalidateIntentToken = { token -> overlay.invalidateIssuedToken(token) },
+                pointAt = { x, y -> overlay.pointAt(x, y) },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -115,7 +116,7 @@ class AgentOrchestratorService : Service() {
     private fun handle(text: String) {
         overlay.status("Thinking…")
         scope.launch {
-            BrainClient.query(text, sessionId) { ev ->
+            BrainClient.query(text, sessionId, Prefs.assistantModel) { ev ->
                 when (ev.optString("type")) {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })

@@ -14,6 +14,7 @@ process.on("unhandledRejection", (e) => console.error("[clyde] unhandledRejectio
 
 const MAX_BODY = 256 * 1024;
 const MAX_INFLIGHT = 1; // one supervised turn at a time (also prevents cross-turn halt races)
+const ALLOWED_MODELS = new Set(["opus", "sonnet", "haiku"]); // app-selectable assistant models
 let inFlight = 0;
 
 function safeEqual(a: string, b: string): boolean {
@@ -101,7 +102,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       res.end(JSON.stringify({ ok: false, error: "request too large" }));
       return;
     }
-    let parsed: { text?: unknown; sessionId?: unknown };
+    let parsed: { text?: unknown; sessionId?: unknown; model?: unknown };
     try {
       parsed = JSON.parse(raw || "{}");
     } catch {
@@ -111,6 +112,9 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     }
     const text = String(parsed.text ?? "").trim();
     const sessionId = String(parsed.sessionId ?? "default");
+    // Allowlist the model so a request can't smuggle an arbitrary string into the SDK option.
+    const model =
+      typeof parsed.model === "string" && ALLOWED_MODELS.has(parsed.model) ? parsed.model : undefined;
     if (!text) {
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "missing text" }));
@@ -121,7 +125,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     const emit = (ev: AgentEvent) => res.write(JSON.stringify(ev) + "\n");
     inFlight++;
     try {
-      await runAgent({ text, sessionId }, emit);
+      await runAgent({ text, sessionId, model }, emit);
     } catch (e) {
       console.error("[clyde] query error:", e);
       emit({ type: "error", text: "Something went wrong while handling that." });

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.bridge.TermuxRunCommand
+import dev.kris.clyde.overlay.ClawdSceneView
 import dev.kris.clyde.runtime.ClaudeAuth
 import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -97,6 +98,10 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ClawdSceneView(sceneKey = if (online == true) "success" else "working", size = 84.dp)
+        }
+        Spacer(Modifier.height(10.dp))
         Eyebrow("setup · connect the brain")
         Spacer(Modifier.height(6.dp))
         Text(
@@ -229,6 +234,18 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
+        // Clawd reflects the live setup state: working through the runtime, thinking during sign-in,
+        // a success hop when all three steps land, an error wobble if unpack/brain fails.
+        val scene = when {
+            runtimeError || brainError -> "error"
+            runtimeReady && online == true && signedIn -> "success"
+            loginActive -> "thinking"
+            else -> "working"
+        }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ClawdSceneView(sceneKey = scene, size = 84.dp)
+        }
+        Spacer(Modifier.height(10.dp))
         Eyebrow("setup · clyde's brain")
         Spacer(Modifier.height(6.dp))
         Text("Setting up Clyde's brain", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 25.sp, letterSpacing = (-0.025).em, color = ClydeColor.Ink)
@@ -265,7 +282,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                                 loginActive = true; loginStatus = "starting…"
                                 auth.start(
                                     onLine = { loginStatus = it.trim().take(90) },
-                                    onUrl = { url -> runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                                    onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
                                     onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
                                 )
                             } else if (!runtimeReady) {

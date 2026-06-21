@@ -14,6 +14,8 @@ import java.util.Locale
 
 /** STT (SpeechRecognizer) + TTS (TextToSpeech). Create/call from the main thread. */
 class VoiceIO(private val ctx: Context) {
+    private companion object { const val GOOGLE_TTS = "com.google.android.tts" }
+
     private var tts: TextToSpeech? = null
     private var recognizer: SpeechRecognizer? = null
 
@@ -25,17 +27,38 @@ class VoiceIO(private val ctx: Context) {
     }
 
     init {
-        tts = TextToSpeech(ctx) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts?.language = Locale.getDefault()
-                tts?.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
+        initTts(GOOGLE_TTS) // prefer Google's engine; falls back to the device default if absent
+    }
+
+    private fun initTts(engine: String?) {
+        tts = TextToSpeech(ctx, { status ->
+            when {
+                status == TextToSpeech.SUCCESS -> configureTts()
+                engine != null -> { tts?.shutdown(); initTts(null) } // Google engine failed → default
             }
-        }
+        }, engine)
+    }
+
+    /** Use Assistant audio attrs + the highest-quality OFFLINE neural voice for the locale. The good
+     *  Google voices report QUALITY_VERY_HIGH and need no network — top-tier voices, no API key, no
+     *  billing (the only voice path compatible with Clyde's subscription-only rule). */
+    private fun configureTts() {
+        val t = tts ?: return
+        t.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+        )
+        val locale = Locale.getDefault()
+        val best = runCatching {
+            t.voices
+                ?.filter { it.locale?.language == locale.language }
+                ?.filter { !it.isNetworkConnectionRequired }
+                ?.filter { it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true }
+                ?.maxByOrNull { it.quality }
+        }.getOrNull()
+        if (best != null) t.voice = best else t.language = locale
     }
 
     fun speak(text: String) = onMain {

@@ -41,6 +41,12 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
+        <!-- See/resolve the user's default browser so we can open OAuth login URLs there. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
         <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="com.google.android.apps.bard" />
         <package android:name="com.termux" />
@@ -68,6 +74,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press "Settings" shortcut → opens the control center (vs the summon popup). -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- ACTION_ASSIST trigger — makes Clyde selectable as the Digital assistant app. -->
