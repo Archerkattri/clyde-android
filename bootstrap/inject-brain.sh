@@ -23,9 +23,12 @@ cp "$ROOT/brain/system-prompt.md" "$TMP/opt/clyde-brain/system-prompt.md"
 npm install --prefix "$TMP" --omit=optional --no-audit --no-fund \
   @anthropic-ai/claude-code@2.1.112
 
-# c) Regenerate SYMLINKS.txt (Termux convention: `target←linkpath`), replacing real symlinks so the
-#    zip stays portable; EmbeddedRuntime.kt recreates them with Os.symlink on extract.
-rm -f SYMLINKS.txt
+# c) APPEND any real symlinks (e.g. claude-code's node_modules/.bin) to the bootstrap's EXISTING
+#    SYMLINKS.txt. CRITICAL: the Termux bootstrap ships its ~1600 base symlinks (bin/sh→dash, the
+#    coreutils applet names, env, …) in THAT file as text, not as real files — so we must NOT delete
+#    it (doing so leaves the runtime with `dash`/`coreutils` binaries but no `sh`/`env`/`ls`/… names,
+#    breaking every shell-based tool). EmbeddedRuntime.kt recreates each entry with Os.symlink on
+#    extract. (Format: `target←linkpath`.)
 find . -type l | while read -r link; do
   printf '%s←%s\n' "$(readlink "$link")" "${link#./}" >> SYMLINKS.txt
   rm "$link"
