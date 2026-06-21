@@ -200,6 +200,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var signedIn by remember { mutableStateOf(false) }
     var loginActive by remember { mutableStateOf(false) }
     var loginStatus by remember { mutableStateOf("") }
+    var loginDetail by remember { mutableStateOf("") } // real CLI output tail, shown if sign-in fails
     var code by remember { mutableStateOf("") }
     var runtimeError by remember { mutableStateOf(false) }
     var brainError by remember { mutableStateOf(false) }
@@ -308,9 +309,9 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                     Modifier.background(if (signInReady || loginActive) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
                         .pressable(label = "Sign in to Claude") {
                             if (signInReady) {
-                                loginActive = true; loginStatus = "starting…"
+                                loginActive = true; loginStatus = "starting…"; loginDetail = ""
                                 auth.start(
-                                    onLine = { loginStatus = it.trim().take(90) },
+                                    onLine = { line -> val t = line.trim(); if (t.isNotEmpty()) { loginStatus = t.take(90); loginDetail = (loginDetail + "\n" + t).takeLast(500) } },
                                     onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
                                     onResult = { ok -> loginActive = false; loginStatus = if (ok) "done" else "sign-in didn't complete — try again"; if (ok) signedIn = true },
                                 )
@@ -323,6 +324,13 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 if (loginStatus.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+                }
+                if (loginStatus.contains("didn't")) {
+                    val detail = loginDetail.ifBlank { auth.outputTail }
+                    if (detail.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("details: ${detail.trim().takeLast(420)}", fontFamily = Mono, fontSize = 10.sp, lineHeight = 14.sp, color = ClydeColor.TerracottaDeep)
+                    }
                 }
                 if (loginActive) {
                     Spacer(Modifier.height(8.dp))
