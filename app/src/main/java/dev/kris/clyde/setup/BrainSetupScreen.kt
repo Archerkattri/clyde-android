@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -203,6 +204,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     var runtimeError by remember { mutableStateOf(false) }
     var brainError by remember { mutableStateOf(false) }
     var lowStorage by remember { mutableStateOf(false) }
+    var progressState by remember { mutableStateOf<EmbeddedRuntime.Progress?>(null) }
     var attempt by remember { mutableStateOf(0) }
 
     // Starting the orchestrator extracts the runtime + launches the brain in-process; then poll real
@@ -218,6 +220,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         var readyAtTick = -1
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
+            progressState = EmbeddedRuntime.progress
             online = BrainClient.healthz()
             if (auth.isSignedIn()) signedIn = true
             if (runtimeReady && readyAtTick < 0) readyAtTick = ticks
@@ -266,11 +269,27 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             if (runtimeError) {
                 Text(
                     if (lowStorage) "Low on storage — the runtime needs ~280 MB free to unpack (you have ${EmbeddedRuntime.freeMb(ctx)} MB). Free some space, then tap Try again."
-                    else "Couldn't finish unpacking the runtime. First run can take a few minutes — tap Try again and leave Clyde open; if it keeps failing, reinstall Clyde.",
+                    else "Couldn't finish unpacking the runtime. Tap Try again and leave Clyde open; if it keeps failing, reinstall Clyde.",
                     fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.TerracottaDeep,
                 )
+                EmbeddedRuntime.lastError?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("details: $it", fontFamily = Mono, fontSize = 10.sp, lineHeight = 14.sp, color = ClydeColor.Muted)
+                }
+            } else if (runtimeReady) {
+                Text("Linux runtime unpacked.", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
             } else {
-                Text(if (runtimeReady) "Linux runtime unpacked." else "Unpacking the runtime… (first run can take a few minutes — leave Clyde open)", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
+                // live unpack status: a bar + phase + MB + ETA so the first run isn't an opaque wait
+                val p = progressState
+                val pct = if (p != null && p.totalBytes > 0L) (p.bytes.toFloat() / p.totalBytes).coerceIn(0f, 1f) else 0f
+                LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth(), color = ClydeColor.Blue, trackColor = ClydeColor.Line)
+                Spacer(Modifier.height(6.dp))
+                val mb = (p?.bytes ?: 0L) / (1024 * 1024)
+                val totalMb = (p?.totalBytes ?: (214L * 1024 * 1024)) / (1024 * 1024)
+                val eta = p?.etaSeconds ?: -1
+                val etaText = if (eta in 0..6000) " · ~${if (eta >= 60) "${eta / 60}m ${eta % 60}s" else "${eta}s"} left" else ""
+                Text("${p?.phase ?: "Unpacking"}… $mb / $totalMb MB$etaText", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+                Text("first run — leave Clyde open", fontFamily = Body, fontSize = 11.sp, color = ClydeColor.Muted)
             }
         }
         Spacer(Modifier.height(12.dp))
