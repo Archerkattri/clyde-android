@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createHash, timingSafeEqual } from "node:crypto";
 import { config, assertSubscriptionAuth, assertServerSafe, apiKeyPresent, offSubscriptionReasons } from "./config";
 import { runAgent, haltActiveTurn } from "./agent";
+import { startLogin, loginStatus } from "./oauth";
 import type { AgentEvent } from "./types";
 
 // Fail loud if a credential override would hijack subscription billing, and fail closed
@@ -85,6 +86,25 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     haltActiveTurn();
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true, killed: true }));
+    return;
+  }
+
+  // No-paste loopback sign-in: returns the authorize URL the app opens in the browser; the brain's own
+  // localhost callback completes it and writes ~/.claude creds. The app then polls /auth/login/status.
+  if (req.method === "POST" && url === "/auth/login/start") {
+    try {
+      const { url: authUrl } = await startLogin();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, url: authUrl }));
+    } catch (e) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: (e as Error).message }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/auth/login/status") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, ...loginStatus() }));
     return;
   }
 
