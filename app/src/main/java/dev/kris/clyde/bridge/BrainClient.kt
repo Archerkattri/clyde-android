@@ -70,6 +70,39 @@ object BrainClient {
         }
     }
 
+    /** Start the no-paste loopback sign-in; returns the authorize URL to open in the browser, or null. */
+    suspend fun startLogin(): String? = withContext(Dispatchers.IO) {
+        try {
+            val c = open("/auth/login/start", "POST")
+            c.doOutput = true
+            c.readTimeout = 15_000
+            c.outputStream.use { it.write(ByteArray(0)) }
+            if (c.responseCode !in 200..299) { c.disconnect(); return@withContext null }
+            val body = c.inputStream.bufferedReader().use { it.readText() }
+            c.disconnect()
+            val j = JSONObject(body)
+            if (j.optBoolean("ok")) j.optString("url").ifBlank { null } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    data class LoginInfo(val signedIn: Boolean, val pending: Boolean, val error: String)
+
+    /** Poll the loopback sign-in: signedIn once creds are written, or a surfaced exchange error. */
+    suspend fun loginStatus(): LoginInfo? = withContext(Dispatchers.IO) {
+        try {
+            val c = open("/auth/login/status", "GET")
+            if (c.responseCode !in 200..299) { c.disconnect(); return@withContext null }
+            val body = c.inputStream.bufferedReader().use { it.readText() }
+            c.disconnect()
+            val j = JSONObject(body)
+            LoginInfo(j.optBoolean("signedIn"), j.optBoolean("pending"), j.optString("error"))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Kill switch — invalidate outstanding confirm tokens on the brain. */
     suspend fun kill(): Boolean = withContext(Dispatchers.IO) {
         try {

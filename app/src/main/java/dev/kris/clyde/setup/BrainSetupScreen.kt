@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import dev.kris.clyde.ui.SecondaryLink
 import dev.kris.clyde.ui.pressable
 import dev.kris.clyde.util.Prefs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * One-time companion setup: get Clyde's brain running in Termux without leaving the app for long.
@@ -194,11 +196,13 @@ private fun TermuxCompanionSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
 @Composable
 private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val auth = remember { ClaudeAuth(ctx) }
     var runtimeReady by remember { mutableStateOf(false) }
     var online by remember { mutableStateOf<Boolean?>(null) }
     var signedIn by remember { mutableStateOf(false) }
-    var code by remember { mutableStateOf("") } // pasted setup token
+    var code by remember { mutableStateOf("") } // pasted setup token (fallback)
+    var loginStatus by remember { mutableStateOf("") }
     var runtimeError by remember { mutableStateOf(false) }
     var brainError by remember { mutableStateOf(false) }
     var lowStorage by remember { mutableStateOf(false) }
@@ -221,6 +225,11 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             progressState = EmbeddedRuntime.progress
             online = BrainClient.healthz()
             if (auth.isSignedIn()) signedIn = true
+            // brain is authoritative for the loopback sign-in: detect completion + surface any error
+            BrainClient.loginStatus()?.let { li ->
+                if (li.signedIn) signedIn = true
+                if (li.error.isNotBlank()) loginStatus = "sign-in error: ${li.error.take(90)}"
+            }
             if (runtimeReady && readyAtTick < 0) readyAtTick = ticks
             // First-run unpack (~200 MB, thousands of small files) is legitimately slow on a phone — wait
             // up to ~5 min before declaring failure. If we're genuinely out of space it won't unpack at
@@ -296,46 +305,58 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 Text("Signed in on your subscription.", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
             } else {
                 Text(
-                    "The login CLI needs a real terminal, so sign in with a one-time token. On a computer that has Claude Code, run this in a terminal:",
+                    "Tap below — Clyde opens Claude in your browser, you authorize, and you're in. No password or token to copy; Clyde never sees them.",
                     fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.fillMaxWidth().background(Color0E, RoundedCornerShape(10.dp)).border(1.dp, Color1E, RoundedCornerShape(10.dp)).padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("claude setup-token", fontFamily = Mono, fontSize = 12.5f.sp, color = TermFg, modifier = Modifier.weight(1f))
-                    Text(
-                        "Copy", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = ClydeColor.BlueText,
-                        modifier = Modifier.pressable(label = "Copy command") {
-                            ctx.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("cmd", "claude setup-token"))
-                        }.padding(6.dp),
-                    )
+                Spacer(Modifier.height(10.dp))
+                val ready = runtimeReady && online == true
+                Box(
+                    Modifier.background(if (ready) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
+                        .pressable(label = "Sign in to Claude") {
+                            if (ready) {
+                                loginStatus = "opening browser…"
+                                scope.launch {
+                                    val url = BrainClient.startLogin()
+                                    if (url != null) {
+                                        dev.kris.clyde.util.Browser.openDefault(ctx, url)
+                                        loginStatus = "authorize in your browser, then come back here"
+                                    } else {
+                                        loginStatus = "couldn't start sign-in — wait for the brain (step 3), then retry"
+                                    }
+                                }
+                            }
+                        }
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                ) { Text(if (ready) "Sign in to Claude" else "Waiting for the brain…", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = if (ready) OnBlue else ClydeColor.Muted) }
+                if (loginStatus.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
                 }
-                Spacer(Modifier.height(8.dp))
+
+                // Fallback: paste a token (for when the in-browser sign-in can't reach the device callback).
+                Spacer(Modifier.height(14.dp))
                 Text(
-                    "Authorize in the browser it opens, then copy the token it prints and paste it here:",
-                    fontFamily = Body, fontSize = 12.5f.sp, lineHeight = 17.sp, color = ClydeColor.Muted,
+                    "Trouble? Run  claude setup-token  on a computer with Claude Code and paste the token:",
+                    fontFamily = Body, fontSize = 11.5f.sp, lineHeight = 16.sp, color = ClydeColor.Muted,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = code, onValueChange = { code = it }, singleLine = true,
-                    label = { Text("paste your token", fontFamily = Body, fontSize = 12.sp) },
+                    label = { Text("paste token (optional)", fontFamily = Body, fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Box(
-                    Modifier.background(if (code.isNotBlank()) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(10.dp))
+                    Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(9.dp))
                         .pressable(label = "Save token") {
                             if (code.isNotBlank()) {
                                 Prefs.oauthToken = code.trim(); code = ""; signedIn = true
-                                // restart the brain so it picks up CLAUDE_CODE_OAUTH_TOKEN at launch
                                 val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_RESTART_BRAIN)
                                 runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i) }
                             }
                         }
-                        .padding(horizontal = 18.dp, vertical = 9.dp),
-                ) { Text("Save token", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (code.isNotBlank()) OnBlue else ClydeColor.Muted) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Text("Save token", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText) }
             }
         }
         Spacer(Modifier.height(12.dp))
