@@ -82,6 +82,8 @@ data class OverlayUi(
     val status: String = "",
     val answer: String = "",
     val clawd: ClawdState = ClawdState.Idle,
+    val scene: String = "", // non-blank → render the composed scene engine instead of the hero state
+
     val confirmSummary: String = "",
     val confirmDetails: String? = null,
     val confirmEffect: String = "",
@@ -162,10 +164,16 @@ class OverlayController(private val appCtx: Context) :
     }
 
     fun transcript(text: String) = onMain { ui.value = ui.value.copy(transcript = text) }
-    fun status(text: String) = onMain { main.removeCallbacks(settle); ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", clawd = ClawdState.Working); attach() }
+    fun status(text: String) = onMain {
+        main.removeCallbacks(settle)
+        // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
+        val sc = overlayScene(text)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, clawd = ClawdState.Working)
+        attach()
+    }
     fun answer(text: String) = onMain {
         main.removeCallbacks(settle)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", clawd = ClawdState.Success)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", clawd = ClawdState.Success)
         attach()
         main.postDelayed(settle, 2200)
     }
@@ -237,7 +245,7 @@ class OverlayController(private val appCtx: Context) :
             issuedTokens[token] = IssuedToken(pendingAction, argsHash(pendingParams), System.currentTimeMillis() + tokenTtlMs)
         }
         confirmResult.offer(Pair(approved, token))
-        onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }
+        onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", scene = "", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }
     }
 
     private fun attach() {
@@ -337,12 +345,13 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             .padding(12.dp)
             .graphicsLayer { translationY = (1f - anim) * 60f; alpha = anim },
     ) {
-        // Clawd perched on the top edge
-        ClawdView(
-            state = ui.clawd,
-            size = 58.dp,
-            modifier = Modifier.align(Alignment.TopCenter).offset(y = (-30).dp),
-        )
+        // Clawd perched on the top edge — composed scene for recognized activities, else the hero state.
+        val perch = Modifier.align(Alignment.TopCenter).offset(y = (-30).dp)
+        if (ui.scene.isNotBlank()) {
+            ClawdSceneView(sceneKey = ui.scene, size = 58.dp, modifier = perch)
+        } else {
+            ClawdView(state = ui.clawd, size = 58.dp, modifier = perch)
+        }
         Column(
             Modifier
                 .fillMaxWidth()
