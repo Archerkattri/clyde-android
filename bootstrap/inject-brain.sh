@@ -12,9 +12,14 @@ unzip -q "$ZIP"   # entries are relative to $PREFIX (files/usr)
 
 # a) Bundle the brain to a single CJS file — no tsx/esbuild needed on the device, which also avoids
 #    esbuild's per-platform native binary (the main ABI-drift risk).
+#    CRITICAL: the SDK (and Node's createRequire) read `import.meta.url`. esbuild's CJS output stubs
+#    `import.meta` to `{}`, so `createRequire(import.meta.url)` becomes `createRequire(undefined)` and
+#    the brain dies on boot. Define import.meta.url to the real file URL via a banner const.
 ( cd "$ROOT/brain" && npm install --no-audit --no-fund \
   && npx --yes esbuild src/server.ts \
        --bundle --platform=node --format=cjs --target=node20 \
+       '--define:import.meta.url=__clyde_meta_url' \
+       '--banner:js=const __clyde_meta_url = require("url").pathToFileURL(__filename).href;' \
        --outfile="$TMP/opt/clyde-brain/server.js" )
 cp "$ROOT/brain/system-prompt.md" "$TMP/opt/clyde-brain/system-prompt.md"
 
