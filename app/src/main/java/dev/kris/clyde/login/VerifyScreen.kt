@@ -26,8 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import dev.kris.clyde.bridge.AuthStatus
 import dev.kris.clyde.bridge.BrainClient
+import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.CheckRow
 import dev.kris.clyde.ui.CheckState
@@ -42,6 +44,7 @@ import kotlinx.coroutines.delay
 /** Panel 02 — Confirming your plan. Polls the brain; verifies, never handles tokens. */
 @Composable
 fun VerifyScreen(onContinue: () -> Unit) {
+    val embedded = EmbeddedRuntime.isBundled(LocalContext.current) // brain runs in-app, not Termux
     var reachable by remember { mutableStateOf<Boolean?>(null) }
     var auth by remember { mutableStateOf<AuthStatus?>(null) }
     var attempt by remember { mutableStateOf(0) }
@@ -121,13 +124,14 @@ fun VerifyScreen(onContinue: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         CheckRow(brainState, "Brain reachable", when { brainState == CheckState.Ok -> "127.0.0.1:8765"; timedOut -> "offline"; else -> "checking…" })
-        CheckRow(subState, "Signed in on a subscription", when { subState == CheckState.Ok -> auth?.plan ?: "subscription"; subState == CheckState.Fail -> "sign in in Termux"; timedOut -> "not yet"; else -> "checking…" })
+        CheckRow(subState, "Signed in on a subscription", when { subState == CheckState.Ok -> auth?.plan ?: "subscription"; subState == CheckState.Fail -> if (embedded) "sign in again" else "sign in in Termux"; timedOut -> "not yet"; else -> "checking…" })
         CheckRow(keyState, "No API key set", when { keyState == CheckState.Ok -> "clean"; keyState == CheckState.Fail -> "remove API key"; else -> "checking…" })
 
         Spacer(Modifier.weight(1f))
         if (timedOut && !verified) {
             Text(
-                "Couldn't confirm yet. Finish claude login in Termux and make sure the brain is running, then check again.",
+                if (embedded) "Couldn't confirm yet. Make sure sign-in finished and the brain is running, then check again."
+                else "Couldn't confirm yet. Finish claude login in Termux and make sure the brain is running, then check again.",
                 fontFamily = Body, fontSize = 12.5f.sp, color = ClydeColor.Muted, modifier = Modifier.padding(bottom = 10.dp),
             )
             Box(

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import dev.kris.clyde.bridge.TermuxRunCommand
+import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeLogo
@@ -37,6 +37,7 @@ import dev.kris.clyde.ui.PrimaryButton
 /** Panel 01 — Sign in with your Claude plan. Launches `claude login` in Termux. */
 @Composable
 fun LoginScreen(onStartSignIn: () -> Unit) {
+    val embedded = EmbeddedRuntime.isBundled(LocalContext.current)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -75,7 +76,8 @@ fun LoginScreen(onStartSignIn: () -> Unit) {
         PrimaryButton("Get started", onClick = onStartSignIn)
         Spacer(Modifier.height(10.dp))
         Text(
-            "Next: a one-time setup gets Clyde's brain running in Termux. Clyde never sees your password or token.",
+            if (embedded) "Next: a one-time setup runs Clyde's brain right inside the app. Clyde never sees your password or token."
+            else "Next: a one-time setup gets Clyde's brain running in Termux. Clyde never sees your password or token.",
             fontFamily = Body,
             fontSize = 12.5f.sp,
             lineHeight = 18.sp,

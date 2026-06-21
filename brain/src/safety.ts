@@ -36,6 +36,16 @@ export class Safety {
   private readonly tokens = new Map<string, TokenRecord>();
   private readonly ownPackage = "dev.kris.clyde";
   private readonly ttlMs = 75_000; // ~ the app's confirm poll window + margin
+  // Tools whose single-use the APP enforces (it burns the token only after a SUCCESSFUL fire, and
+  // preserves it on a recoverable failure for retry). The brain only VALIDATES these (non-burning).
+  // EVERY other consequential tool runs in-process in the brain with no app round-trip, so the brain
+  // must CONSUME (burn) it here — the default is the secure one.
+  private readonly appEnforced = new Set(["open_url", "share_text", "send_sms", "start_call", "add_calendar_event", "delegate_to_gemini"]);
+
+  /** Does the APP independently burn this tool's token on success? If so the brain validates, not burns. */
+  isAppEnforced(tool: string): boolean {
+    return this.appEnforced.has(tool);
+  }
 
   classOf(tool: string): "safe" | "consequential" {
     return SAFE.has(tool) ? "safe" : "consequential";
@@ -62,6 +72,23 @@ export class Safety {
     if (rec.tool !== tool) return { ok: false, error: `that approval was for ${rec.tool}, not ${tool} — confirm the real action.` };
     if (rec.hash !== hash) return { ok: false, error: "the action's details changed since approval — confirm() again with the exact values." };
     rec.used = true;
+    return { ok: true };
+  }
+
+  /** Non-consuming check for the pre-tool gate: same binding as consume, but does NOT burn the token.
+   *  The APP is the authoritative single-use enforcer (it burns only after a SUCCESSFUL fire), so a
+   *  recoverable failure (e.g. a missing permission) can be retried with the same approval instead of
+   *  being wrongly denied because the brain already marked its copy used. */
+  validateToken(token: string | undefined, tool: string, hash: string): { ok: boolean; error?: string } {
+    if (!token) return { ok: false, error: "missing confirmation token — call confirm({action, params}) first and pass its token." };
+    const rec = this.tokens.get(token);
+    if (!rec) return { ok: false, error: "unknown token — tokens only come from confirm(); never invent one." };
+    if (Date.now() > rec.exp) {
+      this.tokens.delete(token);
+      return { ok: false, error: "token expired — call confirm() again." };
+    }
+    if (rec.tool !== tool) return { ok: false, error: `that approval was for ${rec.tool}, not ${tool} — confirm the real action.` };
+    if (rec.hash !== hash) return { ok: false, error: "the action's details changed since approval — confirm() again with the exact values." };
     return { ok: true };
   }
 

@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import dev.kris.clyde.ui.reduceMotion
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -33,7 +36,7 @@ import kotlin.math.sin
  * he's code, so he ships in every build and can never go missing. One rig composes every scene.
  */
 enum class ClawdState(val blue: Boolean, val periodMs: Int) {
-    Idle(true, 2600),
+    Idle(true, 3200), // a calm, slow breath
     Listening(true, 1500),
     Working(true, 900),
     Navigating(true, 1100),
@@ -223,7 +226,8 @@ private fun DrawScope.face(f: RigFrame, p: Pose, sk: ClawdSkin) {
 /** Articulated pincer: open 0=closed‥1=wide, raise lifts it; returns the "mouth" point for held props. */
 private fun DrawScope.claw(f: RigFrame, p: Pose, sk: ClawdSkin, agx: Float, agy: Float, side: Float, open: Float, raise: Float): Offset {
     val sx = f.x(txc(p, if (side < 0) 6f else 13f)); val sy = f.y(tyc(p, 5f))
-    val wx = f.x(txc(p, agx)); val wy = f.y(tyc(p, agy)) - raise * f.cell
+    // arc the claw OUT as it raises — limbs travel curved paths, never straight lines.
+    val wx = f.x(txc(p, agx)) + side * raise * 0.18f * f.cell; val wy = f.y(tyc(p, agy)) - raise * f.cell
     drawLine(sk.s, Offset(sx, sy), Offset(wx, wy), f.cell * 0.55f, StrokeCap.Round)
     drawLine(sk.o, Offset(sx, sy), Offset(wx, wy), f.cell * 0.32f, StrokeCap.Round)
     val reach = side * 1.15f * f.cell
@@ -303,56 +307,85 @@ private fun DrawScope.sparkle(f: RigFrame, p: Pose) {
 
 // ─────────────────────────── motions (phase → Pose) ───────────────────────────
 
-/** Returns sx, sy, ty plus an "airborne" flag for the classic anticipate→launch→apex→land arc. */
-private fun jumpArc(p: Float): FloatArray {
-    var sx = 1f; var sy = 1f; var ty = 0f
-    when {
-        p < 0.18f -> { val k = p / 0.18f; sx = lerp(1f, 1.18f, k); sy = lerp(1f, 0.78f, k); ty = lerp(0f, 0.7f, k) }
-        p < 0.5f -> { val k = (p - 0.18f) / 0.32f; sx = lerp(1.18f, 0.9f, k); sy = lerp(0.78f, 1.22f, k); ty = lerp(0.7f, -4.2f, k) }
-        p < 0.66f -> { val k = (p - 0.5f) / 0.16f; sy = lerp(1.22f, 1.05f, k); ty = -4.2f }
-        p < 0.86f -> { val k = (p - 0.66f) / 0.2f; sx = lerp(0.9f, 1.2f, k); sy = lerp(1.05f, 0.78f, k); ty = lerp(-4.2f, 0.5f, k) }
-        else -> { val k = (p - 0.86f) / 0.14f; sx = lerp(1.2f, 1f, k); sy = lerp(0.78f, 1f, k); ty = lerp(0.5f, 0f, k) }
+// Easing + animation helpers — real craft: slow-in/out (no linear/raw-sine), anticipation,
+// follow-through (claws lag the body), overshoot-and-settle, volume-preserving squash & stretch.
+private fun clamp01(x: Float) = if (x < 0f) 0f else if (x > 1f) 1f else x
+private fun seg(p: Float, s: Float, e: Float, a: Float, b: Float, fn: (Float) -> Float) = lerp(a, b, fn(clamp01((p - s) / (e - s))))
+private fun volSx(sy: Float) = sy.pow(-0.55f) // widen/narrow so the silhouette's area is conserved
+private fun damp(p: Float, amp: Float, freq: Float, decay: Float) = amp * exp(-decay * p) * sin(freq * p * TAU)
+
+private object Ease {
+    fun inOutSine(t: Float) = -(cos(PI.toFloat() * t) - 1f) / 2f
+    fun inQuad(t: Float) = t * t
+    fun outQuad(t: Float) = 1f - (1f - t) * (1f - t)
+    fun outCubic(t: Float) = 1f - (1f - t).pow(3)
+    fun outBounce(t0: Float): Float {
+        val n = 7.5625f; val d = 2.75f; var t = t0
+        return when {
+            t < 1f / d -> n * t * t
+            t < 2f / d -> { t -= 1.5f / d; n * t * t + 0.75f }
+            t < 2.5f / d -> { t -= 2.25f / d; n * t * t + 0.9375f }
+            else -> { t -= 2.625f / d; n * t * t + 0.984375f }
+        }
     }
-    return floatArrayOf(sx, sy, ty, if (ty < -0.5f) 1f else 0f)
 }
 
 fun ClawdState.pose(p: Float): Pose = when (this) {
-    ClawdState.Idle -> Pose(
-        sx = 1 - 0.035f * sin(p * TAU), sy = 1 + 0.05f * sin(p * TAU), ty = -0.3f * sin(p * TAU),
-        raiseL = 0.25f + 0.12f * sin(p * TAU), raiseR = 0.25f + 0.12f * sin(p * TAU + 0.6f),
-        openL = 0.12f, openR = 0.12f, eye = if (p in 0.5f..0.58f) ClawdEye.Closed else ClawdEye.Dot, mouth = ClawdMouth.Flat, p = p,
-    )
-    ClawdState.Listening -> Pose(
-        eye = ClawdEye.Wide, tx = 0.35f, ty = -0.2f * sin(p * TAU),
-        raiseR = 1.7f + 0.15f * sin(p * TAU * 2), openR = 0.2f, raiseL = 0.4f, openL = 0.15f,
-        effect = ClawdEffect.Waves, mouth = ClawdMouth.Flat, p = p,
-    )
-    ClawdState.Working -> {
-        val tap = 0.5f + 0.5f * sin(p * TAU * 2)
+    ClawdState.Idle -> {
+        val breath = Ease.inOutSine((sin(p * TAU) + 1f) / 2f)              // eased breathing
+        val sy = 0.97f + 0.06f * breath
+        val lagL = (sin((p - 0.10f) * TAU) + 1f) / 2f                     // claws trail the body…
+        val lagR = (sin((p - 0.16f) * TAU) + 1f) / 2f                     // …and L/R are offset (no twinning)
         Pose(
-            eye = ClawdEye.Dot, sx = 1 + 0.04f * tap, sy = 1 - 0.04f * tap,
-            raiseR = 0.3f + tap * 0.6f, raiseL = 0.3f + (1 - tap) * 0.6f, openR = 0.2f, openL = 0.2f,
+            sx = volSx(sy), sy = sy, ty = -0.35f * breath,
+            raiseL = 0.22f + 0.16f * lagL, raiseR = 0.22f + 0.16f * lagR, openL = 0.12f, openR = 0.12f,
+            eye = if (p in 0.46f..0.52f) ClawdEye.Closed else ClawdEye.Dot, mouth = ClawdMouth.Flat, p = p,
+        )
+    }
+    ClawdState.Listening -> {
+        val breath = Ease.inOutSine((sin(p * TAU) + 1f) / 2f); val sy = 0.98f + 0.04f * breath
+        val cup = Ease.inOutSine((sin(p * TAU * 2) + 1f) / 2f)
+        Pose(
+            eye = ClawdEye.Wide, tx = 0.35f, ty = -0.2f * breath, sx = volSx(sy), sy = sy,
+            raiseR = 1.7f + 0.15f * cup, openR = 0.2f, raiseL = 0.4f, openL = 0.15f,
+            effect = ClawdEffect.Waves, mouth = ClawdMouth.Flat, p = p,
+        )
+    }
+    ClawdState.Working -> {
+        val beat = (p * 2f) % 1f
+        val down = if (beat < 0.5f) Ease.outQuad(beat / 0.5f) else 1f - Ease.inQuad((beat - 0.5f) / 0.5f) // snappy tap
+        val sy = 1f - 0.05f * down                                        // squash on impact
+        Pose(
+            eye = ClawdEye.Dot, sx = volSx(sy), sy = sy, ty = -0.15f * down,
+            raiseR = 0.5f + down * 0.8f, raiseL = 0.5f + (1f - down) * 0.5f, openR = 0.2f, openL = 0.2f,
             effect = ClawdEffect.Dots, mouth = ClawdMouth.Flat, p = p,
         )
     }
     ClawdState.Navigating -> {
-        val sway = sin(p * TAU)
+        val sway = sin(p * TAU); val sy = 1f - 0.03f * abs(sin(p * TAU * 2))
         Pose(
-            eye = ClawdEye.Wide, tx = 1.0f * sway, ty = abs(sin(p * TAU * 2)) * 0.25f,
+            eye = ClawdEye.Wide, tx = 2f * (Ease.inOutSine((sway + 1f) / 2f) - 0.5f), ty = abs(sin(p * TAU * 2)) * 0.25f,
+            sx = volSx(sy), sy = sy,
             raiseL = 0.5f + 0.3f * sway, raiseR = 0.5f - 0.3f * sway, openL = 0.15f, openR = 0.15f, mouth = ClawdMouth.Flat, p = p,
         )
     }
     ClawdState.Success -> {
-        val a = jumpArc(p); val air = a[3] > 0.5f
+        val ty = if (p < 0.4f) seg(p, 0f, 0.4f, 0f, -3.5f, Ease::outQuad) else -3.5f * (1f - Ease.outBounce((p - 0.4f) / 0.6f))
+        val sy = if (p < 0.14f) lerp(0.82f, 1.16f, Ease.outCubic(p / 0.14f)) else 1f + 0.04f * sin(p * TAU * 3) * (1f - p)
+        val air = ty < -1.0f
         Pose(
-            sx = a[0], sy = a[1], ty = a[2], eye = ClawdEye.Happy,
-            raiseL = if (air) 2.2f else 0.4f, raiseR = if (air) 2.2f else 0.4f,
+            sx = volSx(sy), sy = sy, ty = ty, eye = ClawdEye.Happy,
+            raiseL = if (air) 2.0f else 0.4f, raiseR = if (air) 2.0f else 0.4f,
             openL = if (air) 0.8f else 0.2f, openR = if (air) 0.8f else 0.2f,
             effect = ClawdEffect.Sparkle, mouth = ClawdMouth.Grin, p = p,
         )
     }
-    ClawdState.Error -> Pose(
-        eye = ClawdEye.X, tx = 0.55f * sin(p * TAU * 3),
-        raiseL = -0.2f, raiseR = -0.2f, openL = 0.1f, openR = 0.1f, effect = ClawdEffect.BangWarn, mouth = ClawdMouth.Tongue, p = p,
-    )
+    ClawdState.Error -> {
+        val w = damp(p, 0.9f, 3.0f, 3.2f)                                 // damped wobble — settles, not a constant shake
+        Pose(
+            eye = ClawdEye.X, tx = w, sx = 1f + 0.04f * cos(p * TAU * 3) * exp(-3f * p), sy = 1f,
+            raiseL = -0.2f + w * 0.2f, raiseR = -0.2f - w * 0.2f, openL = 0.1f, openR = 0.1f,
+            effect = ClawdEffect.BangWarn, mouth = ClawdMouth.Tongue, p = p,
+        )
+    }
 }

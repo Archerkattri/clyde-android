@@ -169,7 +169,7 @@ class OverlayController(private val appCtx: Context) :
         attach()
         main.postDelayed(settle, 2200)
     }
-    fun hide() = onMain { main.removeCallbacks(settle); detach() }
+    fun hide() = onMain { main.removeCallbacks(settle); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
 
     /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies.
      *  Serialized: a second concurrent confirm is denied so a token never flows to the wrong waiter. */

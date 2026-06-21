@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -14,6 +16,13 @@ import java.util.Locale
 class VoiceIO(private val ctx: Context) {
     private var tts: TextToSpeech? = null
     private var recognizer: SpeechRecognizer? = null
+
+    // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
+    // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
+    private val main = Handler(Looper.getMainLooper())
+    private inline fun onMain(crossinline block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else main.post { block() }
+    }
 
     init {
         tts = TextToSpeech(ctx) { status ->
@@ -29,14 +38,14 @@ class VoiceIO(private val ctx: Context) {
         }
     }
 
-    fun speak(text: String) {
+    fun speak(text: String) = onMain {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clyde-${System.identityHashCode(text)}")
     }
 
-    fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) {
+    fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             onError("speech recognition unavailable")
-            return
+            return@onMain
         }
         recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(ctx).apply {
@@ -46,7 +55,12 @@ class VoiceIO(private val ctx: Context) {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
-                override fun onError(error: Int) = onError("stt error $error")
+                override fun onError(error: Int) = onError(when (error) {
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "mic-permission"
+                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
+                    SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network"
+                    else -> "stt-$error"
+                })
                 override fun onPartialResults(partialResults: Bundle?) {
                     partialResults?.firstText()?.let(onPartial)
                 }
@@ -67,7 +81,7 @@ class VoiceIO(private val ctx: Context) {
     private fun Bundle.firstText(): String? =
         getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
-    fun stopListening() {
+    fun stopListening() = onMain {
         recognizer?.stopListening()
     }
 

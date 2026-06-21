@@ -58,7 +58,8 @@ function drawEyes(cv, t, style) {
 function drawClaw(cv, t, anchorGx, anchorGy, side, open, raise) {
   const [sx, sy] = T(t, side < 0 ? 6 : 13, 5);                 // shoulder on the body
   const [ax, ay] = T(t, anchorGx, anchorGy);
-  const wx = PXX(ax), wy = PXY(ay) - raise * CELL;
+  // arc the claw OUT as it raises (limbs travel on curved paths, never straight lines)
+  const wx = PXX(ax) + side * raise * 0.18 * CELL, wy = PXY(ay) - raise * CELL;
   cv.line(PXX(sx), PXY(sy), wx, wy, PAL.s, CELL * 0.55);       // short stubby arm
   cv.line(PXX(sx), PXY(sy), wx, wy, PAL.o, CELL * 0.32);
   const reach = side * 1.15 * CELL;
@@ -109,29 +110,75 @@ function frame(W, H, pose) {
   return cv;
 }
 
-// ── motions (p in [0,1)) ──
+// ── motions (p in [0,1)) — real animation craft: eased timing (no linear/raw-sine), anticipation,
+//    follow-through (claws lag the body), overshoot-and-settle, volume-preserving squash & stretch. ──
 const TAU = Math.PI * 2;
-const ease = (a, b, x) => a + (b - a) * x;
+const lerp = (a, b, x) => a + (b - a) * x;
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const seg = (p, s, e, a, b, fn) => lerp(a, b, fn(clamp01((p - s) / (e - s)))); // eased sub-range of p
+const E = {
+  inOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  inQuad: (t) => t * t,
+  outQuad: (t) => 1 - (1 - t) * (1 - t),
+  outCubic: (t) => 1 - Math.pow(1 - t, 3),
+  outBack: (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  outBounce: (t) => { const n = 7.5625, d = 2.75; if (t < 1 / d) return n * t * t; if (t < 2 / d) return n * (t -= 1.5 / d) * t + 0.75; if (t < 2.5 / d) return n * (t -= 2.25 / d) * t + 0.9375; return n * (t -= 2.625 / d) * t + 0.984375; },
+};
+const vol = (s) => ({ sx: Math.pow(s, -0.55), sy: s });            // squash/stretch with volume preserved
+const damp = (p, amp, freq, decay) => amp * Math.exp(-decay * p) * Math.sin(freq * p * TAU); // settling wobble
+
 const MOTIONS = {
-  idle: (p) => ({ sx: 1 - 0.035 * Math.sin(p * TAU), sy: 1 + 0.05 * Math.sin(p * TAU), ty: -0.3 * Math.sin(p * TAU), raiseL: 0.25 + 0.12 * Math.sin(p * TAU), raiseR: 0.25 + 0.12 * Math.sin(p * TAU + 0.6), openL: 0.12, openR: 0.12, eye: p > 0.5 && p < 0.58 ? "closed" : "dot" }),
-  jump: (p) => {
-    let sx = 1, sy = 1, ty = 0;
-    if (p < 0.18) { const k = p / 0.18; sx = ease(1, 1.18, k); sy = ease(1, 0.78, k); ty = ease(0, 0.7, k); }       // anticipate
-    else if (p < 0.5) { const k = (p - 0.18) / 0.32; sx = ease(1.18, 0.9, k); sy = ease(0.78, 1.22, k); ty = ease(0.7, -4.2, k); } // launch + rise
-    else if (p < 0.66) { const k = (p - 0.5) / 0.16; sy = ease(1.22, 1.05, k); ty = ease(-4.2, -4.2, k); }          // apex
-    else if (p < 0.86) { const k = (p - 0.66) / 0.2; sx = ease(0.9, 1.2, k); sy = ease(1.05, 0.78, k); ty = ease(-4.2, 0.5, k); } // fall + land
-    else { const k = (p - 0.86) / 0.14; sx = ease(1.2, 1, k); sy = ease(0.78, 1, k); ty = ease(0.5, 0, k); }        // recover
-    const air = ty < -0.5;
-    return { sx, sy, ty, eye: air ? "wide" : "dot", raiseL: air ? 2.2 : 0, raiseR: air ? 2.2 : 0, openL: air ? 0.9 : 0.1, openR: air ? 0.9 : 0.1, effect: p > 0.45 && p < 0.66 ? "bang" : null };
+  idle: (p) => {
+    const breath = E.inOutSine((Math.sin(p * TAU) + 1) / 2);      // eased breathing (slow-in/out)
+    const s = vol(0.97 + 0.06 * breath);
+    const lagL = (Math.sin((p - 0.10) * TAU) + 1) / 2;           // claws trail the body (follow-through)
+    const lagR = (Math.sin((p - 0.16) * TAU) + 1) / 2;           // …and L/R are offset (no twinning)
+    return { sx: s.sx, sy: s.sy, ty: -0.35 * breath, raiseL: 0.22 + 0.16 * lagL, raiseR: 0.22 + 0.16 * lagR, openL: 0.12, openR: 0.12, eye: (p > 0.46 && p < 0.52) ? "closed" : "dot" };
   },
-  wave: (p) => { const o = 0.5 + 0.5 * Math.sin(p * TAU * 2); return { eye: "happy", raiseL: 1.6, raiseR: 1.6, openL: o, openR: 1 - o, sy: 1 + 0.03 * Math.sin(p * TAU * 2) }; },
-  work: (p) => { const tap = 0.5 + 0.5 * Math.sin(p * TAU * 2); return { eye: "dot", accessory: "hardhat", prop: "wrench", env: "bolt", raiseR: 0.4 + tap * 0.7, propAng: -0.9 + tap * 0.7, openR: 0.15, openL: 0.4 + 0.4 * Math.sin(p * TAU * 2 + 1), raiseL: 0.6, sy: 1 - 0.04 * tap, sx: 1 + 0.04 * tap }; },
-  groove: (p) => ({ eye: "happy", accessory: "headphones", effect: "notes", tx: 1.3 * Math.sin(p * TAU), sx: 1 + 0.05 * Math.sin(p * TAU * 2), sy: 1 - 0.05 * Math.sin(p * TAU * 2), raiseL: 0.8 + 0.5 * Math.sin(p * TAU), raiseR: 0.8 - 0.5 * Math.sin(p * TAU), openL: 0.6, openR: 0.6, p }),
+  jump: (p) => {
+    let s, ty;
+    if (p < 0.16) { s = lerp(1, 0.74, E.outQuad(clamp01(p / 0.16))); ty = seg(p, 0, 0.16, 0, 0.8, E.outQuad); }                       // anticipate: compress + dip
+    else if (p < 0.26) { s = lerp(0.74, 1.28, E.outCubic(clamp01((p - 0.16) / 0.10))); ty = seg(p, 0.16, 0.26, 0.8, -2.2, E.outCubic); } // launch: stretch + shove off
+    else if (p < 0.5) { s = lerp(1.28, 1.06, E.outQuad(clamp01((p - 0.26) / 0.24))); ty = seg(p, 0.26, 0.5, -2.2, -4.6, E.outQuad); }    // rise, decelerating into apex
+    else if (p < 0.6) { s = 1.06; ty = -4.6 + 0.15 * Math.sin(((p - 0.5) / 0.1) * Math.PI); }                                           // apex hang
+    else if (p < 0.8) { s = lerp(1.06, 1.2, E.inQuad(clamp01((p - 0.6) / 0.2))); ty = seg(p, 0.6, 0.8, -4.6, 0.6, E.inQuad); }           // fall, accelerating + stretch
+    else if (p < 0.9) { s = lerp(1.2, 0.72, E.outQuad(clamp01((p - 0.8) / 0.1))); ty = seg(p, 0.8, 0.9, 0.6, 0.5, E.outQuad); }          // land squash
+    else { s = lerp(0.72, 1, E.outBack(clamp01((p - 0.9) / 0.1))); ty = seg(p, 0.9, 1, 0.5, 0, E.outBack); }                            // recover with overshoot
+    const v = vol(s), air = ty < -1.0;
+    const cl = air ? 2.0 : (p > 0.8 && p < 0.92 ? -0.4 : 0);      // claws whip up in air, overshoot down on land
+    return { sx: v.sx, sy: v.sy, ty, eye: air ? "wide" : "dot", raiseL: cl, raiseR: cl, openL: air ? 0.85 : 0.12, openR: air ? 0.85 : 0.12, effect: (p > 0.16 && p < 0.3) ? "bang" : null };
+  },
+  wave: (p) => {
+    const o = (Math.sin(p * TAU * 2 - Math.PI / 2) + 1) / 2;
+    const s = vol(1 + 0.02 * Math.sin(p * TAU * 2));
+    return { sx: s.sx, sy: s.sy, eye: "happy", raiseL: 1.5 + 0.2 * o, raiseR: 0.5 - 0.15 * o, openL: o, openR: 0.15, tx: 0.15 * Math.sin(p * TAU) };
+  },
+  work: (p) => {
+    const beat = (p * 2) % 1;                                     // two taps per cycle
+    const down = beat < 0.5 ? E.outQuad(beat / 0.5) : 1 - E.inQuad((beat - 0.5) / 0.5); // snappy down, ease-in recover
+    const s = vol(1 - 0.05 * down);                              // body squashes on impact
+    return { sx: s.sx, sy: s.sy, eye: "dot", accessory: "hardhat", prop: "wrench", env: "bolt", raiseR: 0.5 + down * 0.8, propAng: -1.0 + down * 0.8, openR: 0.15, raiseL: 0.5 + (1 - down) * 0.5, openL: 0.2, ty: -0.15 * down };
+  },
+  groove: (p) => {
+    const sway = Math.sin(p * TAU);
+    const beat = E.inOutSine((Math.sin(p * TAU * 2) + 1) / 2);
+    const s = vol(1 - 0.05 * beat);
+    return { sx: s.sx, sy: s.sy, eye: "happy", accessory: "headphones", effect: "notes", tx: 1.2 * (E.inOutSine((sway + 1) / 2) - 0.5), raiseL: 0.7 + 0.5 * Math.sin((p - 0.1) * TAU), raiseR: 0.7 - 0.5 * Math.sin((p - 0.1) * TAU), openL: 0.6, openR: 0.6, p };
+  },
+  success: (p) => {                                              // a bouncy hop: rise, then bounce-land
+    const ty = p < 0.4 ? seg(p, 0, 0.4, 0, -3.5, E.outQuad) : -3.5 * (1 - E.outBounce((p - 0.4) / 0.6));
+    const s = p < 0.14 ? vol(lerp(0.82, 1.16, E.outCubic(p / 0.14))) : vol(1 + 0.04 * Math.sin(p * TAU * 3) * (1 - p));
+    return { sx: s.sx, sy: s.sy, ty, eye: "happy", raiseL: 2.0, raiseR: 2.0, openL: 0.8, openR: 0.8, effect: "bang" };
+  },
+  error: (p) => {                                                // damped wobble — sharp then settling
+    const w = damp(p, 0.9, 3.0, 3.2);
+    return { eye: "x", sx: 1 + 0.04 * Math.cos(p * TAU * 3) * Math.exp(-3 * p), sy: 1, tx: w, raiseL: -0.2 + w * 0.2, raiseR: -0.2 - w * 0.2, openL: 0.1, openR: 0.1 };
+  },
 };
 
 // ── filmstrip ──
-const ORDER = ["idle", "jump", "wave", "work", "groove"];
-const FR = 8, Wc = 21, Hc = 22, fw = Wc * CELL, fh = Hc * CELL, gap = 6, pad = 10;
+const ORDER = ["idle", "jump", "wave", "work", "groove", "success", "error"];
+const FR = 10, Wc = 21, Hc = 22, fw = Wc * CELL, fh = Hc * CELL, gap = 6, pad = 10;
 const sheetW = pad * 2 + FR * fw + (FR - 1) * gap;
 const sheetH = pad * 2 + ORDER.length * fh + (ORDER.length - 1) * gap;
 const sheet = new Cv(sheetW, sheetH, "#EFEDE6");

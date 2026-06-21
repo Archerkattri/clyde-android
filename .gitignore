@@ -47,3 +47,7 @@ bootstrap/.work/
 # --- build cache + scratch QA renders (regenerable from scripts/) ---
 .kotlin/
 design/clawd/_*.png
+
+# editor / image-viewer lock files
+.~lock.*#
+*.~lock.*#

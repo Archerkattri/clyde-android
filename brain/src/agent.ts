@@ -51,6 +51,7 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
   haltCurrent = () => { halted = true; };
 
   let finalText = "";
+  let resultSubtype = "";
   const q = query({
     prompt: args.text,
     options: {
@@ -73,7 +74,13 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
         const stop = safety.hardStop(t, a);
         if (stop) return { behavior: "deny", message: stop };
         if (safety.isConsequential(t)) {
-          const r = safety.consumeToken(a.token as string | undefined, t, argsHash(a));
+          // App-enforced tools: only VALIDATE here (don't burn) — the app burns the token on a
+          // successful fire and preserves it on a recoverable failure, so the model can retry.
+          // Every other consequential tool runs in-process in the brain with no app burn, so the
+          // brain must CONSUME (single-use) here or one approval would authorise unlimited re-fires.
+          const r = safety.isAppEnforced(t)
+            ? safety.validateToken(a.token as string | undefined, t, argsHash(a))
+            : safety.consumeToken(a.token as string | undefined, t, argsHash(a));
           if (!r.ok) return { behavior: "deny", message: r.error ?? "confirmation required" };
         }
         return { behavior: "allow" };
@@ -111,6 +118,7 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
 
       if (msg.type === "result") {
         finalText = (m.result as string | undefined) ?? finalText;
+        resultSubtype = (m.subtype as string | undefined) ?? resultSubtype;
       }
     }
   } catch (e) {
@@ -122,5 +130,9 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
     haltCurrent = null;
   }
 
-  emit({ type: "final", text: finalText || "Done." });
+  // Don't fake a cheerful "Done." when the turn didn't actually finish (hit max turns / errored).
+  const final = finalText.trim() ||
+    (resultSubtype.includes("max_turns") ? "That got complicated — I stopped before finishing. Try a smaller step." :
+      resultSubtype.startsWith("error") ? "Something went wrong while handling that." : "Done.");
+  emit({ type: "final", text: final });
 }

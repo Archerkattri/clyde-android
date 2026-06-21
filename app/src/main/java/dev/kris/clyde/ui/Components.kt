@@ -84,9 +84,10 @@ fun Modifier.pressable(label: String? = null, role: Role = Role.Button, onClick:
 @Composable
 fun reduceMotion(): Boolean {
     val ctx = LocalContext.current
-    return remember {
-        Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
+    // Read live (not cached in remember) so toggling "Remove animations" mid-session takes effect on
+    // the next recompose; treat either the animator OR transition scale being 0 as "reduce motion".
+    return Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f ||
+        Settings.Global.getFloat(ctx.contentResolver, Settings.Global.TRANSITION_ANIMATION_SCALE, 1f) == 0f
 }
 
 @Composable

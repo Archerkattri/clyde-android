@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,7 +46,9 @@ private enum class Screen { Login, BrainSetup, Verify, Setup, Home }
 private fun ClydeRoot() {
     val ctx = LocalContext.current
     val reduce = reduceMotion()
-    var screen by remember { mutableStateOf(if (Prefs.signedIn) Screen.Home else Screen.Login) }
+    // rememberSaveable so a process-death restart resumes the right screen; configChanges (manifest)
+    // keeps rotation/dark-mode/font-scale from recreating the Activity and restarting onboarding.
+    var screen by rememberSaveable { mutableStateOf(if (Prefs.signedIn) Screen.Home else Screen.Login) }
     Surface(modifier = Modifier.fillMaxSize(), color = ClydeColor.Paper) {
         AnimatedContent(
             targetState = screen,

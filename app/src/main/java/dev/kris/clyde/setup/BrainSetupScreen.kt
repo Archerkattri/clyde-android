@@ -216,6 +216,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             // a real failure with a retry rather than leaving every step card spinning indefinitely.
             if (!runtimeReady && ticks >= 45) { runtimeError = true; return@LaunchedEffect }
             if (runtimeReady && online != true && ticks >= 60) { brainError = true; return@LaunchedEffect }
+            if (runtimeReady && online == true && signedIn) return@LaunchedEffect // fully ready — stop polling
             ticks++
             delay(2000)
         }

@@ -100,7 +100,15 @@ class AgentOrchestratorService : Service() {
         voice.listen(
             onPartial = { overlay.transcript(it) },
             onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
-            onError = { overlay.status("Didn't catch that"); Log.w(TAG, "Speech recognition error: $it") },
+            onError = { err ->
+                overlay.status(when (err) {
+                    "mic-permission" -> "Mic access is off — enable it for Clyde in Settings"
+                    "network" -> "No connection for speech recognition"
+                    "speech recognition unavailable" -> "Speech isn't available on this device"
+                    else -> "Didn't catch that — try again"
+                })
+                Log.w(TAG, "Speech recognition error: $err")
+            },
         )
     }
 
@@ -111,7 +119,9 @@ class AgentOrchestratorService : Service() {
                 when (ev.optString("type")) {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
-                    "final" -> ev.optString("text").let { overlay.answer(it); voice.speak(it) }
+                    "need_confirm" -> overlay.status(ev.optString("summary").ifBlank { "Waiting for your OK…" })
+                    // ignore a blank final (e.g. a turn that ended with no answer) — keep the last status
+                    "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) }
                     "error" -> {
                         Log.w(TAG, "brain error: ${ev.optString("text")}")
                         val msg = "Sorry, something went wrong — try again."

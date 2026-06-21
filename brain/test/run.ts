@@ -59,6 +59,24 @@ s.registerToken("tokU", "open_url", hUrl);
 check("same-hash token cannot cross tools", s.consumeToken("tokU", "share_text", hUrl).ok === false);
 check("failed cross-tool attempt does not consume the token", s.consumeToken("tokU", "open_url", hUrl).ok === true);
 
+// ── the token GATE: validate (non-burning) for APP-enforced tools so a recoverable failure can
+//    retry; CONSUME (single-use) for brain-local tools so one approval can't authorise re-fires.
+//    (Regression the goal-batch verification caught: validate-only had let brain-local tools re-fire.)
+check("open_url is app-enforced", s.isAppEnforced("open_url") === true);
+check("delegate_to_gemini is app-enforced", s.isAppEnforced("delegate_to_gemini") === true);
+check("su_shell is NOT app-enforced (brain must burn it)", s.isAppEnforced("su_shell") === false);
+check("mic_record is NOT app-enforced", s.isAppEnforced("mic_record") === false);
+const hV = argsHash({ url: "https://ok.com" });
+s.registerToken("tokV", "open_url", hV);
+check("validateToken accepts a bound token", s.validateToken("tokV", "open_url", hV).ok === true);
+check("validateToken does NOT burn — still valid (retry works)", s.validateToken("tokV", "open_url", hV).ok === true);
+check("validateToken still rejects a cross-tool token", s.validateToken("tokV", "su_shell", argsHash({ cmd: "x" })).ok === false);
+check("validateToken still rejects changed args", s.validateToken("tokV", "open_url", argsHash({ url: "https://evil.com" })).ok === false);
+const hC = argsHash({ cmd: "echo hi" });
+s.registerToken("tokC2", "su_shell", hC);
+check("brain-local su_shell consumes once", s.consumeToken("tokC2", "su_shell", hC).ok === true);
+check("brain-local su_shell cannot re-fire on one approval", s.consumeToken("tokC2", "su_shell", hC).ok === false);
+
 // ── hard stops on cross-vendor egress / sharing tools ──
 check("blocks payment via delegate_to_gemini", s.hardStop("delegate_to_gemini", { prompt: "go place an order on amazon" }) !== null);
 check("allows benign delegate_to_gemini", s.hardStop("delegate_to_gemini", { prompt: "what is the weather" }) === null);
