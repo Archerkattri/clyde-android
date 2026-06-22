@@ -98,8 +98,11 @@ async function handleCallback(req: IncomingMessage, res: ServerResponse): Promis
 }
 
 async function exchange(code: string, verifier: string, redirectUri: string, state: string): Promise<Record<string, unknown>> {
-  // Body mirrors the CLI's exchange exactly — note `state` is required alongside the PKCE verifier.
-  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state };
+  // Body mirrors the CLI's exchange — `state` is required alongside the PKCE verifier, and
+  // `expires_in` requests a 1-YEAR token exactly like `claude setup-token`. Without it the token
+  // defaults to ~1 hour; once it lapses the API returns 401 "Invalid authentication credentials"
+  // (refresh isn't reliably recovering it in the embedded runtime). The long-lived token avoids that.
+  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state, expires_in: 31536000 };
   const r = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
