@@ -64,6 +64,17 @@ class AgentOrchestratorService : Service() {
                 // ships without re-unpacking the whole runtime. Without this the brain went stale.
                 EmbeddedRuntime.refreshBrain(applicationContext, appVersionTag())
                 brain.start(Prefs.clydeKey)
+                // Poll up to 8 s so startup errors land in logcat (and the notification) rather than
+                // disappearing silently. The real diagnostic is in BrainRunner.diag.
+                val deadline = System.currentTimeMillis() + 8_000L
+                while (!brain.isRunning() && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(300)
+                }
+                if (!brain.isRunning()) {
+                    val diag = BrainRunner.diag.ifBlank { "no output captured" }
+                    Log.e(TAG, "Brain never came up (8 s timeout):\n$diag")
+                    updateNotification("Brain offline — tap Clyde to see error")
+                }
             }
         }
     }
@@ -110,6 +121,12 @@ class AgentOrchestratorService : Service() {
 
     private fun beginAssist() {
         overlay.showSummon()
+        // If the embedded brain hasn't come up, show its startup diagnostics immediately instead of
+        // falling into voice-listen → connection-refused → generic "something went wrong" message.
+        if (EmbeddedRuntime.isBundled(applicationContext) && !brain.isRunning()) {
+            overlay.answer("Brain offline:\n${BrainRunner.diag.take(600).ifBlank { "no output captured" }}")
+            return
+        }
         voice.listen(
             onPartial = { overlay.transcript(it) },
             onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
@@ -184,6 +201,16 @@ class AgentOrchestratorService : Service() {
                 Log.e(TAG, "startForeground failed entirely", e2)
             }
         }
+    }
+
+    private fun updateNotification(text: String) {
+        val notif = NotificationCompat.Builder(this, CHANNEL)
+            .setContentTitle("Clyde")
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_clyde_logo)
+            .setOngoing(true)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notif)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
