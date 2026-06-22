@@ -1,6 +1,7 @@
 import { createSdkMcpServer, type SdkMcpToolDefinition } from "@anthropic-ai/claude-agent-sdk";
 import type { ToolCtx } from "../context";
 import { makeMetaTools } from "./meta";
+import { makeTier0Intents } from "./tier0-intents";
 import { makeTier0Termux } from "./tier0-termuxapi";
 import { makeTier1Accessibility } from "./tier1-accessibility";
 import { makeTier2Shizuku } from "./tier2-shizuku";
@@ -13,6 +14,7 @@ export const CLYDE_SERVER_NAME = "clyde";
 export function buildClydeTools(ctx: ToolCtx): SdkMcpToolDefinition<any>[] {
   const tools: SdkMcpToolDefinition<any>[] = [
     ...makeMetaTools(ctx),
+    ...makeTier0Intents(ctx),
     ...makeTier0Termux(ctx),
     ...makeGeminiTools(ctx),
   ];
