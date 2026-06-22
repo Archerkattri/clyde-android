@@ -148,7 +148,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       await runAgent({ text, sessionId, model }, emit);
     } catch (e) {
       console.error("[clyde] query error:", e);
-      emit({ type: "error", text: "Something went wrong while handling that." });
+      emit({ type: "error", text: "Something went wrong while handling that.", detail: String((e as Error)?.message ?? e).slice(0, 240) });
     } finally {
       inFlight--;
       res.end();

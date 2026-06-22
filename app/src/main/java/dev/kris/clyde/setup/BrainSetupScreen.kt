@@ -223,6 +223,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         }
         var ticks = 0
         var readyAtTick = -1
+        var bouncedAfterLogin = false
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
             progressState = EmbeddedRuntime.progress
@@ -233,6 +234,16 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
             BrainClient.loginStatus()?.let { li ->
                 if (li.signedIn) signedIn = true
                 if (li.error.isNotBlank()) loginStatus = "sign-in error: ${li.error.take(90)}"
+            }
+            // The brain started BEFORE creds existed, so the Agent SDK has no auth and every query
+            // fails. The moment sign-in lands, bounce the brain ONCE so it relaunches with the creds
+            // file present and picks up the subscription. Without this, queries said "something went
+            // wrong" even though login succeeded.
+            if (signedIn && !bouncedAfterLogin) {
+                bouncedAfterLogin = true
+                val ri = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_RESTART_BRAIN)
+                runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(ri) else ctx.startService(ri) }
+                online = false // it'll blip offline during the bounce; reflect that until healthz returns
             }
             if (runtimeReady && readyAtTick < 0) readyAtTick = ticks
             // First-run unpack (~200 MB, thousands of small files) is legitimately slow on a phone — wait

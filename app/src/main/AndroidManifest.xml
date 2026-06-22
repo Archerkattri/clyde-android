@@ -81,7 +81,9 @@
             android:name=".assist.AssistEntryActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:launchMode="singleTask"
+            android:autoRemoveFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
             android:noHistory="true"
             android:theme="@style/Theme.Clyde.Translucent">
             <intent-filter>

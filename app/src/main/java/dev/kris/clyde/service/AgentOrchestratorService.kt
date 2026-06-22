@@ -153,9 +153,12 @@ class AgentOrchestratorService : Service() {
                     // ignore a blank final (e.g. a turn that ended with no answer) — keep the last status
                     "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) }
                     "error" -> {
-                        Log.w(TAG, "brain error: ${ev.optString("text")}")
-                        val msg = "Sorry, something went wrong — try again."
-                        overlay.answer(msg); voice.speak(msg)
+                        val detail = ev.optString("detail").trim()
+                        Log.w(TAG, "brain error: ${ev.optString("text")} | detail=$detail")
+                        // Surface the real reason on screen (detail) so failures are diagnosable instead
+                        // of an opaque "something went wrong"; speak a short, friendly version.
+                        val shown = if (detail.isNotEmpty()) "Sorry — $detail" else "Sorry, something went wrong — try again."
+                        overlay.answer(shown); voice.speak("Sorry, something went wrong.")
                     }
                     else -> {}
                 }

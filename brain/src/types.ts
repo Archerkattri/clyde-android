@@ -49,6 +49,6 @@ export type AgentEvent =
   | { type: "action"; tool: string; summary: string }
   | { type: "need_confirm"; summary: string; details?: string }
   | { type: "final"; text: string }
-  | { type: "error"; text: string };
+  | { type: "error"; text: string; detail?: string }; // detail = short real reason, for diagnostics
 
 export type Emit = (ev: AgentEvent) => void;
