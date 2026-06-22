@@ -67,7 +67,14 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
       // Point the SDK at the JS claude-code CLI explicitly when CLAUDE_CLI_PATH is set (the
       // embedded/bundled runtime needs this; on a normal Termux install the CLI is on PATH so we
       // leave the SDK default). The native CLI has no Android build, so the JS release is required.
-      ...(config.claudeCliPath ? { pathToClaudeCodeExecutable: config.claudeCliPath } : {}),
+      // ALSO override `executable`: the SDK spawns the CLI as `node <cli.js>`, but it spawns the bare
+      // string "node" from PATH — which doesn't exist in the embedded runtime (our node binary is
+      // libnode.so in nativeLibraryDir, and exec'ing node from app storage is W^X-blocked anyway). So
+      // the launch failed ("executable exists but failed to launch"). process.execPath is the exact
+      // exec-allowed node the brain itself runs under, so spawning it + cli.js works on-device.
+      ...(config.claudeCliPath
+        ? { pathToClaudeCodeExecutable: config.claudeCliPath, executable: process.execPath as "node" }
+        : {}),
       // Central enforcement — runs before EVERY tool call (safe and consequential).
       canUseTool: async (toolName, input) => {
         const t = toolName.replace(/^mcp__clyde__/, "");
