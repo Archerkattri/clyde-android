@@ -78,9 +78,11 @@ class LocalControlServer(
                 uri.startsWith("/intent/") -> {
                     val name = uri.removePrefix("/intent/")
                     val needPerm = DeviceIntents.missingPermissionFor(ctx, name)
+                    val needAccess = DeviceIntents.missingAccessFor(ctx, name)
                     when {
                         // distinct, recoverable error BEFORE touching the token, so it isn't burned
                         needPerm != null -> err("$name needs the $needPerm permission — grant it in Clyde, then retry")
+                        needAccess != null -> { DeviceIntents.openAccessSettings(ctx, name); err("$name needs $needAccess — I opened the screen to enable it; turn it on, then retry") }
                         name in SAFE_INTENTS ->
                             if (DeviceIntents.fire(ctx, name, body)) ok(JSONObject().put("fired", name)) else err("$name failed")
                         else -> {
@@ -100,8 +102,10 @@ class LocalControlServer(
                 uri.startsWith("/query/") -> {
                     val name = uri.removePrefix("/query/")
                     val needPerm = DeviceQueries.missingPermissionFor(ctx, name)
+                    val needAccess = DeviceQueries.missingAccessFor(name)
                     when {
                         needPerm != null -> err("$name needs the $needPerm permission — grant it in Clyde, then retry")
+                        needAccess != null -> { DeviceQueries.openAccessSettings(ctx, name); err("$name needs $needAccess — I opened the screen to enable it; turn it on, then retry") }
                         else -> DeviceQueries.query(ctx, name, body)?.let { ok(it) } ?: err("unknown query: $name")
                     }
                 }

@@ -25,6 +25,9 @@ export function describeAction(tool: string, p: Record<string, unknown> = {}): A
     case "su_shell": return { summary: "Run a command as root", details: s("cmd") };
     case "pm_grant": return { summary: `Grant ${s("permission")} to ${s("pkg")}` };
     case "settings_put": return { summary: `Change ${s("namespace")} setting ${s("key")} → ${s("value")}` };
+    case "set_dnd": return { summary: `Set Do Not Disturb: ${s("mode")}` };
+    case "set_ringer_mode": return { summary: `Set ringer to ${s("mode")}` };
+    case "set_brightness": return { summary: `Set brightness to ${s("level")}` };
     case "app_disable": return { summary: `Disable the app ${s("pkg")}` };
     case "force_stop": return { summary: `Force-stop ${s("pkg")}` };
     case "disable_phantom_killer": return { summary: "Stop Android from killing the brain" };

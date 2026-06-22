@@ -13,6 +13,9 @@ const SAFE = new Set<string>([
   "tts_speak", "read_sensor", "wifi_info", "volume_set",
   // deterministic, low-risk intents
   "launch_app", "set_alarm", "set_timer", "navigate_to",
+  "play_media", "media_control", "compose_email", "web_search", "open_settings_panel",
+  // read-only queries (any send/exfil tool they feed stays consequential + gated)
+  "find_contact", "list_apps", "list_calendar_events", "read_notifications",
 ]);
 
 /** Stable hash of a tool's args (excludes the token) — binds an approval to one concrete call. */
@@ -40,7 +43,7 @@ export class Safety {
   // preserves it on a recoverable failure for retry). The brain only VALIDATES these (non-burning).
   // EVERY other consequential tool runs in-process in the brain with no app round-trip, so the brain
   // must CONSUME (burn) it here — the default is the secure one.
-  private readonly appEnforced = new Set(["open_url", "share_text", "send_sms", "start_call", "add_calendar_event", "delegate_to_gemini"]);
+  private readonly appEnforced = new Set(["open_url", "share_text", "send_sms", "start_call", "add_calendar_event", "delegate_to_gemini", "set_dnd", "set_ringer_mode", "set_brightness"]);
 
   /** Does the APP independently burn this tool's token on success? If so the brain validates, not burns. */
   isAppEnforced(tool: string): boolean {

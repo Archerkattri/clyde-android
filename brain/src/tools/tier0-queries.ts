@@ -31,5 +31,12 @@ export function makeTier0Queries(ctx: ToolCtx) {
       { days: z.number().int().optional() },
       async (a) => q("list_calendar_events", a)
     ),
+
+    tool(
+      "read_notifications",
+      "Read the user's current notifications (app, title, text), newest first. Use for 'what did I miss?'. Needs Notification access.",
+      {},
+      async () => q("read_notifications", {})
+    ),
   ];
 }

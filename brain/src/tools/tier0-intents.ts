@@ -54,6 +54,39 @@ export function makeTier0Intents(ctx: ToolCtx) {
     ),
 
     tool(
+      "set_dnd",
+      "Turn Do Not Disturb on/off or set its level. Consequential — confirm() first.",
+      { mode: z.enum(["off", "priority", "alarms", "silence"]), token: z.string().describe("token from confirm()") },
+      async (a) => {
+        const g = gate(ctx, "set_dnd", a);
+        if (g) return g;
+        return fire("set_dnd", { mode: a.mode, token: a.token }, a.mode === "off" ? "Do Not Disturb off." : `Do Not Disturb: ${a.mode}.`);
+      }
+    ),
+
+    tool(
+      "set_ringer_mode",
+      "Set the ringer to normal, vibrate, or silent. Consequential — confirm() first.",
+      { mode: z.enum(["normal", "vibrate", "silent"]), token: z.string().describe("token from confirm()") },
+      async (a) => {
+        const g = gate(ctx, "set_ringer_mode", a);
+        if (g) return g;
+        return fire("set_ringer_mode", { mode: a.mode, token: a.token }, `Ringer ${a.mode}.`);
+      }
+    ),
+
+    tool(
+      "set_brightness",
+      "Set screen brightness (0–255). Consequential — confirm() first.",
+      { level: z.number().int().min(0).max(255), token: z.string().describe("token from confirm()") },
+      async (a) => {
+        const g = gate(ctx, "set_brightness", a);
+        if (g) return g;
+        return fire("set_brightness", { level: a.level, token: a.token }, `Brightness ${a.level}.`);
+      }
+    ),
+
+    tool(
       "set_alarm",
       "Set an alarm at a specific time.",
       { hour: z.number().int(), minutes: z.number().int(), message: z.string().optional() },

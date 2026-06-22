@@ -1,6 +1,7 @@
 package dev.kris.clyde.intents
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.SearchManager
 import android.content.ContentValues
 import android.content.Context
@@ -27,6 +28,9 @@ object DeviceIntents {
         "compose_email" -> composeEmail(ctx, body.optString("to"), body.optString("subject"), body.optString("body"))
         "web_search" -> webSearch(ctx, body.optString("query"))
         "open_settings_panel" -> openSettingsPanel(ctx, body.optString("panel"))
+        "set_dnd" -> setDnd(ctx, body.optString("mode"))
+        "set_ringer_mode" -> setRingerMode(ctx, body.optString("mode"))
+        "set_brightness" -> setBrightness(ctx, body.optInt("level"))
         "set_alarm" -> setAlarm(ctx, body.optInt("hour"), body.optInt("minutes"), body.optString("message"))
         "set_timer" -> setTimer(ctx, body.optInt("seconds"), body.optString("message"))
         "navigate_to" -> navigateTo(ctx, body.optString("destination"), body.optString("mode"))
@@ -52,6 +56,26 @@ object DeviceIntents {
         }
         val granted = ContextCompat.checkSelfPermission(ctx, perm) == PackageManager.PERMISSION_GRANTED
         return if (granted) null else perm.substringAfterLast('.')
+    }
+
+    /** Special access (not a runtime permission) a tool needs but doesn't have — null if granted.
+     *  Checked before the confirm token so the user is sent to enable it instead of burning approval. */
+    fun missingAccessFor(ctx: Context, name: String): String? = when (name) {
+        "set_dnd", "set_ringer_mode" ->
+            if (ctx.getSystemService(NotificationManager::class.java)?.isNotificationPolicyAccessGranted == true) null
+            else "Do Not Disturb access"
+        "set_brightness" -> if (Settings.System.canWrite(ctx)) null else "permission to modify system settings"
+        else -> null
+    }
+
+    /** Open the settings screen where the user grants the special access a tool needs. */
+    fun openAccessSettings(ctx: Context, name: String) {
+        val intent = when (name) {
+            "set_dnd", "set_ringer_mode" -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+            "set_brightness" -> Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + ctx.packageName))
+            else -> return
+        }
+        runCatching { ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     private fun start(ctx: Context, intent: Intent): Boolean = try {
@@ -141,6 +165,37 @@ object DeviceIntents {
             else -> Intent(Settings.ACTION_SETTINGS)
         }
         return start(ctx, intent)
+    }
+
+    private fun setDnd(ctx: Context, mode: String): Boolean {
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return false
+        val filter = when (mode) {
+            "off", "all" -> NotificationManager.INTERRUPTION_FILTER_ALL
+            "priority" -> NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            "alarms" -> NotificationManager.INTERRUPTION_FILTER_ALARMS
+            "silence", "none", "total" -> NotificationManager.INTERRUPTION_FILTER_NONE
+            else -> return false
+        }
+        return try { nm.setInterruptionFilter(filter); true } catch (_: Exception) { false }
+    }
+
+    private fun setRingerMode(ctx: Context, mode: String): Boolean {
+        val am = ctx.getSystemService(AudioManager::class.java) ?: return false
+        val m = when (mode) {
+            "normal", "ring" -> AudioManager.RINGER_MODE_NORMAL
+            "vibrate" -> AudioManager.RINGER_MODE_VIBRATE
+            "silent" -> AudioManager.RINGER_MODE_SILENT
+            else -> return false
+        }
+        return try { am.ringerMode = m; true } catch (_: Exception) { false }
+    }
+
+    private fun setBrightness(ctx: Context, level: Int): Boolean = try {
+        Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+        Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, level.coerceIn(0, 255))
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun setAlarm(ctx: Context, hour: Int, minutes: Int, message: String?): Boolean =

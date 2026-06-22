@@ -6,7 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import android.provider.ContactsContract
+import android.provider.Settings
 import androidx.core.content.ContextCompat
+import dev.kris.clyde.service.ClydeNotificationListener
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -30,11 +32,25 @@ object DeviceQueries {
         return if (granted) null else perm.substringAfterLast('.')
     }
 
+    /** Special access (not a runtime permission) a query needs but doesn't have — null if granted. */
+    fun missingAccessFor(name: String): String? = when (name) {
+        "read_notifications" -> if (ClydeNotificationListener.instance != null) null else "Notification access"
+        else -> null
+    }
+
+    /** Open the settings screen where the user grants the special access a query needs. */
+    fun openAccessSettings(ctx: Context, name: String) {
+        if (name == "read_notifications") runCatching {
+            ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     /** Run a read query. Returns JSON, or null for an unknown query name. */
     fun query(ctx: Context, name: String, body: JSONObject): JSONObject? = when (name) {
         "find_contact" -> findContact(ctx, body.optString("name"))
         "list_apps" -> listApps(ctx, body.optString("filter"))
         "list_calendar_events" -> listCalendarEvents(ctx, body.optInt("days", 7).coerceIn(1, 60))
+        "read_notifications" -> JSONObject().put("notifications", ClydeNotificationListener.snapshot() ?: JSONArray())
         else -> null
     }
 

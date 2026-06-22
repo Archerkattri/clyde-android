@@ -121,6 +121,17 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- Notification access (Tier-0 read) — the user enables this in Settings > Notification access. -->
+        <service
+            android:name=".service.ClydeNotificationListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Shizuku provider (Tier-2). -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
