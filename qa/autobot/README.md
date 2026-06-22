@@ -5,12 +5,20 @@ An AutoBot-style tester for Clyde: the **`claude` CLI drives your phone** throug
 runs the flows in [`test-plan.md`](test-plan.md), critiques each screen, and writes a
 `report-<timestamp>.md`. No manual tapping — you watch it work.
 
-It runs on **your computer with your phone plugged in** (not in CI / not on the build PC), because it
-drives a live device over ADB. Clyde's brain is arm64, so an x86 emulator can't run it — a real phone
-(or arm64 device) is required.
+It drives a live device over ADB. There are **two modes**:
+
+| Mode | Script | Tests | Needs |
+|---|---|---|---|
+| **Full E2E** | `run.sh` | UI **+ brain** (sign-in, queries, device control) | a **real arm64 phone** (or an arm64 emulator) |
+| **UI-only** | `run-emulator-ui.sh` | **UI rendering only** (layout, fonts, Clawd, the ask-bar) | a fast **x86_64 emulator** |
+
+Why the split: Clyde's brain is a standalone **arm64 `node` binary**. An x86_64 emulator runs Clyde's
+*UI* fine via ARM translation, but Android's arm64-translation runner **cannot exec the brain** — so
+login/queries/device-control can't be tested on an x86_64 emulator. Use the UI-only mode for fast
+visual regression there, and the full E2E mode on a real phone (or a slow arm64 emulator) for the brain.
 
 ## Prerequisites
-1. **Node 22+** (mobile-mcp requires it): `node -v`.
+1. **Node 18+** (mobile-mcp requires it): `node -v`.
 2. **Android platform-tools** (`adb`) on your PATH. From the Android SDK, or `brew install android-platform-tools`.
 3. **`claude` CLI**, signed in: run `claude` once and complete login (your Pro/Max subscription).
 4. **Clyde installed on the phone** (v0.1.26+), and **already signed in** inside Clyde (see caveat below).

@@ -7,7 +7,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── preflight ─────────────────────────────────────────────────────────────
 command -v adb    >/dev/null || { echo "✗ adb not found — install Android platform-tools and add to PATH."; exit 1; }
 command -v claude >/dev/null || { echo "✗ claude CLI not found — install it and run 'claude' once to sign in."; exit 1; }
-command -v npx    >/dev/null || { echo "✗ npx/node not found — install Node 22+ (mobile-mcp needs it)."; exit 1; }
+command -v npx    >/dev/null || { echo "✗ npx/node not found — install Node 18+ (mobile-mcp needs it)."; exit 1; }
 
 DEVICES="$(adb devices | awk 'NR>1 && $2=="device"{print $1}')"
 if [ -z "$DEVICES" ]; then
