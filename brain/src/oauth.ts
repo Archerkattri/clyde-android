@@ -21,10 +21,12 @@ const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 // page shows it for copy-paste. This URL is registered for the client (the localhost loopback, with a
 // port, is what claude.ai rejects after approval on mobile).
 const MANUAL_REDIRECT_URL = "https://platform.claude.com/oauth/code/callback";
-// EXACT default scope set the claude-code CLI's `login` requests (its AY1 list) — a full-token login,
-// not setup-token's inference-only set. The authorize endpoint rejects a different/partial set, so
-// mirror it verbatim.
-const SCOPE = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+// The claude.ai OAuth scopes (the CLI's CLAUDE_AI_OAUTH_SCOPES / dH8 set), DELIBERATELY WITHOUT
+// `org:create_api_key`. That extra scope is org-admin (mint an API key) — accounts that aren't org
+// admins (personal / edu / managed) can't grant it, so claude.ai rejects the whole grant AFTER the
+// user taps Approve ("invalid request format"). Clyde is subscription-only and must never create an
+// API key, so we drop it on principle too. These five are what a subscription token actually needs.
+const SCOPE = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 
 const b64url = (b: Buffer): string => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
