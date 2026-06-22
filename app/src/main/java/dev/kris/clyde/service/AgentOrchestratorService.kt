@@ -113,8 +113,9 @@ class AgentOrchestratorService : Service() {
                 overlay.hide()
                 voice.stopListening()
             }
-            // Token just pasted → bounce the brain so it relaunches WITH CLAUDE_CODE_OAUTH_TOKEN.
-            ACTION_RESTART_BRAIN -> { brain.stop(); maybeStartEmbeddedBrain() }
+            // Token just pasted / fresh login → bounce the brain so it relaunches WITH creds loaded.
+            // Off the main thread: stop() now blocks until the old process dies (frees port 8765).
+            ACTION_RESTART_BRAIN -> scope.launch(Dispatchers.IO) { brain.stop(); maybeStartEmbeddedBrain() }
         }
         return START_STICKY
     }

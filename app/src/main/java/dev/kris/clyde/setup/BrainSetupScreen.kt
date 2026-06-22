@@ -224,6 +224,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
         var ticks = 0
         var readyAtTick = -1
         var bouncedAfterLogin = false
+        var credsAtStart: Boolean? = null
         while (true) {
             runtimeReady = EmbeddedRuntime.isInstalled(ctx)
             progressState = EmbeddedRuntime.progress
@@ -235,11 +236,12 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 if (li.signedIn) signedIn = true
                 if (li.error.isNotBlank()) loginStatus = "sign-in error: ${li.error.take(90)}"
             }
-            // The brain started BEFORE creds existed, so the Agent SDK has no auth and every query
-            // fails. The moment sign-in lands, bounce the brain ONCE so it relaunches with the creds
-            // file present and picks up the subscription. Without this, queries said "something went
-            // wrong" even though login succeeded.
-            if (signedIn && !bouncedAfterLogin) {
+            // Record whether the user was ALREADY signed in when setup opened. If so, the brain
+            // started WITH creds present and is authed — bouncing it would needlessly restart (and the
+            // restart race caused EADDRINUSE / brain offline). Only bounce when sign-in lands AFTER
+            // launch (a fresh login), so the brain — which started without creds — reloads them.
+            if (credsAtStart == null) credsAtStart = signedIn
+            if (signedIn && credsAtStart == false && !bouncedAfterLogin) {
                 bouncedAfterLogin = true
                 val ri = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_RESTART_BRAIN)
                 runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(ri) else ctx.startService(ri) }

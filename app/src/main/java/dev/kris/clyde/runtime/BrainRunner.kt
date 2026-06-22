@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import dev.kris.clyde.util.Prefs
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
@@ -137,8 +138,18 @@ class BrainRunner(private val ctx: Context) {
     @Synchronized
     fun stop() {
         stopped = true
-        runCatching { proc?.destroy() }
+        val p = proc
         proc = null
+        // BLOCK until the process is really gone so a restart can rebind 127.0.0.1:8765. A plain
+        // destroy() is async (SIGTERM); if start() runs before the old node releases the port the new
+        // one dies with EADDRINUSE and the brain never comes back. SIGKILL + wait guarantees release.
+        runCatching {
+            p?.destroy()
+            if (p != null && !p.waitFor(3, TimeUnit.SECONDS)) {
+                p.destroyForcibly()
+                p.waitFor(2, TimeUnit.SECONDS)
+            }
+        }
         runCatching { logFile.delete() } // don't leave captured brain output on disk after a session
     }
 

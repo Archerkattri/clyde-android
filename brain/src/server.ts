@@ -160,6 +160,19 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   res.end(JSON.stringify({ ok: false, error: "not found" }));
 });
 
+// If the port is briefly held by a previous (dying or orphaned) brain instance, RETRY binding for a
+// few seconds instead of crashing with EADDRINUSE — otherwise a stale process keeps the brain offline.
+let bindRetries = 0;
+server.on("error", (e: NodeJS.ErrnoException) => {
+  if (e.code === "EADDRINUSE" && bindRetries < 15) {
+    bindRetries++;
+    console.error(`[clyde] ${config.brainHost}:${config.brainPort} busy; retry ${bindRetries}/15 in 1s`);
+    setTimeout(() => { try { server.close(); } catch { /* ignore */ } server.listen(config.brainPort, config.brainHost); }, 1000);
+  } else {
+    console.error("[clyde] server error:", e);
+    process.exit(1);
+  }
+});
 server.listen(config.brainPort, config.brainHost, () => {
   console.log(`[clyde] brain listening on http://${config.brainHost}:${config.brainPort}  (auth: shared-key)`);
 });
