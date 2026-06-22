@@ -11,7 +11,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
@@ -32,8 +35,10 @@ import kotlin.math.roundToInt
 fun FitToScreen(
     modifier: Modifier = Modifier,
     insets: WindowInsets = WindowInsets.safeDrawing,
+    maxContentWidth: Dp = 560.dp,
     content: @Composable () -> Unit,
 ) {
+    val capPx = with(LocalDensity.current) { maxContentWidth.roundToPx() }
     Layout(
         // Wrap in a width-filling Box so there's always exactly one block to measure & scale.
         content = { Box(Modifier.fillMaxWidth()) { content() } },
@@ -44,8 +49,11 @@ fun FitToScreen(
     ) { measurables, constraints ->
         val maxW = constraints.maxWidth
         val maxH = constraints.maxHeight
-        // Fixed width = the space we have; unbounded height so the block reports the height it WANTS.
-        val childConstraints = Constraints(minWidth = maxW, maxWidth = maxW, minHeight = 0, maxHeight = Constraints.Infinity)
+        // Cap the content width on large screens (tablets, foldables open) so the panel sits as a
+        // centered column instead of stretching edge-to-edge. Phones (narrower than the cap) are
+        // unaffected — childW == maxW there. Unbounded height so the block reports the height it WANTS.
+        val childW = minOf(maxW, capPx)
+        val childConstraints = Constraints(minWidth = childW, maxWidth = childW, minHeight = 0, maxHeight = Constraints.Infinity)
         val placeables = measurables.map { it.measure(childConstraints) }
         val contentH = placeables.maxOfOrNull { it.height } ?: 0
         // Only ever shrink. If it already fits, scale stays 1f and it renders pixel-for-pixel.
