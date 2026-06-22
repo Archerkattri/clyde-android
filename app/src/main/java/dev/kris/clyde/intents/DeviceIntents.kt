@@ -1,14 +1,19 @@
 package dev.kris.clyde.intents
 
 import android.Manifest
+import android.app.SearchManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.provider.MediaStore
+import android.provider.Settings
 import android.telephony.SmsManager
+import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
@@ -17,6 +22,11 @@ object DeviceIntents {
 
     fun fire(ctx: Context, name: String, body: JSONObject): Boolean = when (name) {
         "launch_app" -> launchApp(ctx, body.optString("package"), body.optString("query"))
+        "play_media" -> playMedia(ctx, body.optString("query"))
+        "media_control" -> mediaControl(ctx, body.optString("action"))
+        "compose_email" -> composeEmail(ctx, body.optString("to"), body.optString("subject"), body.optString("body"))
+        "web_search" -> webSearch(ctx, body.optString("query"))
+        "open_settings_panel" -> openSettingsPanel(ctx, body.optString("panel"))
         "set_alarm" -> setAlarm(ctx, body.optInt("hour"), body.optInt("minutes"), body.optString("message"))
         "set_timer" -> setTimer(ctx, body.optInt("seconds"), body.optString("message"))
         "navigate_to" -> navigateTo(ctx, body.optString("destination"), body.optString("mode"))
@@ -68,6 +78,69 @@ object DeviceIntents {
             }
         }
         return false
+    }
+
+    /** Android's standard "play from search": any media app that registers for it (YouTube Music,
+     *  Spotify, …) resolves the query and plays — the same mechanism a system assistant uses. */
+    private fun playMedia(ctx: Context, query: String): Boolean {
+        if (query.isBlank()) return false
+        return start(ctx, Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
+            putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+            putExtra(SearchManager.QUERY, query)
+        })
+    }
+
+    /** Control current playback by dispatching a media-button event to the active media session. */
+    private fun mediaControl(ctx: Context, action: String): Boolean {
+        val code = when (action) {
+            "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+            "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            "play_pause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+            "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+            "rewind" -> KeyEvent.KEYCODE_MEDIA_REWIND
+            "fast_forward" -> KeyEvent.KEYCODE_MEDIA_FAST_FORWARD
+            else -> return false
+        }
+        return try {
+            val am = ctx.getSystemService(AudioManager::class.java) ?: return false
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun composeEmail(ctx: Context, to: String, subject: String, body: String): Boolean =
+        start(ctx, Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + Uri.encode(to))).apply {
+            if (subject.isNotBlank()) putExtra(Intent.EXTRA_SUBJECT, subject)
+            if (body.isNotBlank()) putExtra(Intent.EXTRA_TEXT, body)
+        })
+
+    private fun webSearch(ctx: Context, query: String): Boolean {
+        if (query.isBlank()) return false
+        return start(ctx, Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query)) ||
+            start(ctx, Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query))))
+    }
+
+    /** Open a system settings screen so the user can flip something apps can't change directly. */
+    private fun openSettingsPanel(ctx: Context, panel: String): Boolean {
+        val intent = when (panel) {
+            "wifi" -> Intent(Settings.Panel.ACTION_WIFI)
+            "internet" -> Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
+            "volume" -> Intent(Settings.Panel.ACTION_VOLUME)
+            "nfc" -> Intent(Settings.Panel.ACTION_NFC)
+            "bluetooth" -> Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+            "airplane" -> Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)
+            "location" -> Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            "battery_saver" -> Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)
+            "data_usage" -> Intent(Settings.ACTION_DATA_USAGE_SETTINGS)
+            "app_details" -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx.packageName))
+            else -> Intent(Settings.ACTION_SETTINGS)
+        }
+        return start(ctx, intent)
     }
 
     private fun setAlarm(ctx: Context, hour: Int, minutes: Int, message: String?): Boolean =

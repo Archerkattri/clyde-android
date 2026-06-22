@@ -35,7 +35,7 @@ class LocalControlServer(
         // Fail-closed allowlist: ONLY these intents fire without a user-approved token. Everything
         // else (open_url, share_text, send_sms, start_call, add_calendar_event, and any future
         // intent) is gated app-side, never trusting the brain to self-gate (defense-in-depth).
-        private val SAFE_INTENTS = setOf("launch_app", "set_alarm", "set_timer", "navigate_to")
+        private val SAFE_INTENTS = setOf("launch_app", "set_alarm", "set_timer", "navigate_to", "play_media", "media_control", "compose_email", "web_search", "open_settings_panel")
     }
 
     override fun serve(session: IHTTPSession): Response {

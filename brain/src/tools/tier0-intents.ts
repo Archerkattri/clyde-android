@@ -19,6 +19,41 @@ export function makeTier0Intents(ctx: ToolCtx) {
     ),
 
     tool(
+      "play_media",
+      "Play music or audio by search — a song, artist, album, playlist, podcast, or station. Uses Android's play-from-search, so the user's media app (YouTube Music, Spotify, etc.) handles it without UI-driving. PREFER this over driving the screen for any 'play X' request.",
+      { query: z.string().describe('what to play, e.g. "Let Down by Radiohead"') },
+      async (a) => fire("play_media", a, `Playing ${a.query}.`)
+    ),
+
+    tool(
+      "media_control",
+      "Control whatever is currently playing across any media app (dispatches a media-button event).",
+      { action: z.enum(["play", "pause", "play_pause", "next", "previous", "stop", "rewind", "fast_forward"]) },
+      async (a) => fire("media_control", a, a.action.replace("_", " "))
+    ),
+
+    tool(
+      "compose_email",
+      "Open the user's email app with a message pre-filled. The user reviews and taps send — nothing is sent automatically, so this is safe.",
+      { to: z.string().optional(), subject: z.string().optional(), body: z.string().optional() },
+      async (a) => fire("compose_email", a, "Opening a draft email.")
+    ),
+
+    tool(
+      "web_search",
+      "Search the web — opens the device's search/browser with the query.",
+      { query: z.string() },
+      async (a) => fire("web_search", a, `Searching the web for ${a.query}.`)
+    ),
+
+    tool(
+      "open_settings_panel",
+      "Open a system settings screen so the user can toggle something apps aren't allowed to change directly (Wi-Fi, Bluetooth, airplane mode, etc.). You open it; the user flips the switch.",
+      { panel: z.enum(["wifi", "internet", "bluetooth", "nfc", "volume", "airplane", "location", "battery_saver", "data_usage", "app_details"]) },
+      async (a) => fire("open_settings_panel", a, "Opening settings.")
+    ),
+
+    tool(
       "set_alarm",
       "Set an alarm at a specific time.",
       { hour: z.number().int(), minutes: z.number().int(), message: z.string().optional() },
