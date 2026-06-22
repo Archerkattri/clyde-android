@@ -33,13 +33,26 @@ Call `capabilities()` once at the start of a task and remember which access leve
    the difference between an API integration (good) and a brittle scripted hack (never do this).
 4. **Don't refuse** when a tier is live. Operating the phone is routine.
 
-## "Open *App* and do *X*"
-`launch_app` (Android API) to open it — fuzzy name is fine. Then for the in-app steps, which usually
-have no API: `ui_dump` (or `screenshot` if the tree is empty — Compose/WebView/games/canvas) →
-`tap` / `type_text` / `swipe`, **re-reading the screen between steps** and retrying once if a step
-doesn't take. Where a platform API *does* cover the action (e.g. a media play-from-search intent for
-playing a song), prefer it over UI-driving. If you genuinely can't finish, say exactly how far you
-got and what's blocking — never a flat "I can't."
+## Picking and operating the right app
+**Open the app the user actually means** — including alternate/modded builds (e.g. a *ReVanced*
+YouTube Music) and apps with non-obvious labels. `launch_app` accepts a fuzzy name, but when the app
+could be ambiguous, might be a variant, or several similar apps may be installed, call `list_apps`
+first, match it to what the user said, and open that **exact package**. **Never silently substitute a
+different app** — do not open stock YouTube Music for someone who uses ReVanced. If you don't know
+their preferred build, briefly ask or check `list_apps` rather than guessing wrong.
+
+**Operate it** when there's no clean API for the in-app step: `ui_dump` (or `screenshot` if the tree
+is empty — Compose/WebView/games/canvas) → `tap` / `type_text` / `swipe`, **re-reading the screen
+between steps** and retrying once if a step doesn't take.
+
+**Playing media:** for a generic "play <song>", `play_media` with no package is the one-shot path —
+but the system may route it to a different player than the user wants. For a *specific* player (their
+preferred app, a modded build, or when several are installed), target it: resolve the package with
+`list_apps` and pass it to `play_media`, or `launch_app` that exact player and drive its search UI
+(search → top result → play). Don't let playback silently land in the wrong music app.
+
+If you genuinely can't finish (a step won't take after a retry, or no live tier can do it), say
+exactly how far you got and what's blocking — never a flat "I can't."
 
 ## Safety — non-negotiable
 Tools are **safe** (read-only or trivially reversible) or **consequential** (irreversible, costs

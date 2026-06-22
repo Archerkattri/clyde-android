@@ -23,7 +23,7 @@ object DeviceIntents {
 
     fun fire(ctx: Context, name: String, body: JSONObject): Boolean = when (name) {
         "launch_app" -> launchApp(ctx, body.optString("package"), body.optString("query"))
-        "play_media" -> playMedia(ctx, body.optString("query"))
+        "play_media" -> playMedia(ctx, body.optString("query"), body.optString("package"))
         "media_control" -> mediaControl(ctx, body.optString("action"))
         "compose_email" -> composeEmail(ctx, body.optString("to"), body.optString("subject"), body.optString("body"))
         "web_search" -> webSearch(ctx, body.optString("query"))
@@ -106,11 +106,14 @@ object DeviceIntents {
 
     /** Android's standard "play from search": any media app that registers for it (YouTube Music,
      *  Spotify, …) resolves the query and plays — the same mechanism a system assistant uses. */
-    private fun playMedia(ctx: Context, query: String): Boolean {
+    private fun playMedia(ctx: Context, query: String, pkg: String): Boolean {
         if (query.isBlank()) return false
         return start(ctx, Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
             putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
             putExtra(SearchManager.QUERY, query)
+            // Target a specific player (e.g. a ReVanced build) when the brain resolved one; otherwise
+            // the system routes to the default media app.
+            if (pkg.isNotBlank()) setPackage(pkg)
         })
     }
 
