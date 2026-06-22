@@ -66,6 +66,8 @@ private val RUNTIME_PERMS = arrayOf(
     android.Manifest.permission.SEND_SMS,
     android.Manifest.permission.ACCESS_FINE_LOCATION,
     android.Manifest.permission.WRITE_CALENDAR,
+    android.Manifest.permission.READ_CALENDAR,
+    android.Manifest.permission.READ_CONTACTS,
 )
 
 private enum class SetupStep { Branch, Chooser, Pairing, Grants }
@@ -172,7 +174,7 @@ private fun ColumnScope.GrantsView(onFinish: () -> Unit) {
     )
     Spacer(Modifier.height(16.dp))
     GrantRow("Set Clyde as your assistant", "so the assist gesture opens Clyde, not Gemini", done = assistantOn) { openAssistantSettings(ctx) }
-    GrantRow("App permissions", "mic, calls, texts, calendar, location", done = permsGranted) { permLauncher.launch(RUNTIME_PERMS) }
+    GrantRow("App permissions", "mic, calls, texts, contacts, calendar, location", done = permsGranted) { permLauncher.launch(RUNTIME_PERMS) }
     GrantRow("Draw over apps", "for the summon overlay", done = overlayOn) { requestOverlay(ctx) }
     GrantRow("Accessibility", "to see & tap the screen", done = accessibilityOn) { openAccessibility(ctx) }
     Spacer(Modifier.height(16.dp))

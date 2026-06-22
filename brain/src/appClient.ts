@@ -63,6 +63,11 @@ export class AppClient {
     return this.req<unknown>("POST", `/intent/${name}`, body);
   }
 
+  // ── Tier 0 read queries (contacts, apps, calendar — return JSON) ──
+  query(name: string, body: Record<string, unknown> = {}) {
+    return this.req<unknown>("POST", `/query/${name}`, body);
+  }
+
   // ── voice / overlay / gemini / confirm ──
   speak(text: string) {
     return this.req("POST", "/speak", { text });

@@ -3,6 +3,7 @@ package dev.kris.clyde.bridge
 import android.content.Context
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.intents.DeviceIntents
+import dev.kris.clyde.intents.DeviceQueries
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.PhoneControlAccessibilityService
 import dev.kris.clyde.voice.VoiceIO
@@ -94,6 +95,14 @@ class LocalControlServer(
                                 else -> err("$name failed") // token preserved — user can retry without re-approving
                             }
                         }
+                    }
+                }
+                uri.startsWith("/query/") -> {
+                    val name = uri.removePrefix("/query/")
+                    val needPerm = DeviceQueries.missingPermissionFor(ctx, name)
+                    when {
+                        needPerm != null -> err("$name needs the $needPerm permission — grant it in Clyde, then retry")
+                        else -> DeviceQueries.query(ctx, name, body)?.let { ok(it) } ?: err("unknown query: $name")
                     }
                 }
                 uri == "/speak" -> { voice.speak(body.optString("text")); ok(JSONObject()) }

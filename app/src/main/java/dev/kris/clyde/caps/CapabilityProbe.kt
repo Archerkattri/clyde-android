@@ -52,6 +52,7 @@ object CapabilityProbe {
                 "sms" to granted(ctx, Manifest.permission.SEND_SMS),
                 "location" to granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION),
                 "calendar" to granted(ctx, Manifest.permission.WRITE_CALENDAR),
+                "contacts" to granted(ctx, Manifest.permission.READ_CONTACTS),
             ),
         )
     }
