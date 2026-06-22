@@ -60,6 +60,11 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
       model: args.model ?? config.model, // app's per-turn pick wins; else the brain default
 
       mcpServers: { [CLYDE_SERVER_NAME]: server },
+      // The bundled CLI denies in-process MCP tools by default (it never routes them through our
+      // canUseTool). Explicitly allow the Clyde server's tools so they actually run; safety is still
+      // enforced — canUseTool below gates consequential tools, and the app independently validates
+      // every consequential intent's confirm-token before firing it.
+      allowedTools: [`mcp__${CLYDE_SERVER_NAME}`],
       permissionMode: "default",
       includePartialMessages: true,
       settingSources: [],
