@@ -25,6 +25,7 @@ object EmbeddedRuntime {
     /** Per-ABI bootstrap baked into the APK. Only arm64 is shipped (see /bootstrap/README.md). */
     const val ASSET_ARM64 = "bootstrap-aarch64.zip"
     private const val VERSION_FILE = ".clyde-bootstrap-version"
+    private const val BRAIN_FILE = ".clyde-brain-version"
 
     fun prefixDir(ctx: Context): File = File(ctx.filesDir, "usr")
     fun homeDir(ctx: Context): File = File(ctx.filesDir, "home")
@@ -38,6 +39,42 @@ object EmbeddedRuntime {
 
     /** Ready = the asset (brain + CLI + node_modules + libs) is extracted. node itself rides in the APK. */
     fun isInstalled(ctx: Context): Boolean = brainEntry(ctx).exists()
+
+    /**
+     * Overwrite JUST the small brain files under opt/clyde-brain (~2 MB) from the asset when the app
+     * version changed. The full ~200 MB runtime is gated on a structural version that rarely changes,
+     * so without this a brain fix shipped in a new APK would never be extracted (the bug behind a
+     * stale brain surviving updates). node/CLI/libs are untouched. Cheap: scans the zip once per update.
+     */
+    @Synchronized
+    fun refreshBrain(ctx: Context, appVersion: String): Boolean {
+        if (!isBundled(ctx)) return false
+        val marker = File(ctx.filesDir, BRAIN_FILE)
+        if (brainEntry(ctx).exists() && runCatching { marker.readText() }.getOrNull() == appVersion) return true
+        return runCatching {
+            val prefix = prefixDir(ctx)
+            var n = 0
+            ctx.assets.open(ASSET_ARM64).use { raw ->
+                ZipInputStream(raw.buffered()).use { zin ->
+                    var entry = zin.nextEntry
+                    while (entry != null) {
+                        val name = entry.name
+                        if (!entry.isDirectory && name.startsWith("opt/clyde-brain/")) {
+                            val out = File(prefix, name)
+                            out.parentFile?.mkdirs()
+                            out.outputStream().use { zin.copyTo(it) }
+                            n++
+                        }
+                        zin.closeEntry()
+                        entry = zin.nextEntry
+                    }
+                }
+            }
+            marker.writeText(appVersion)
+            Log.i(TAG, "brain refreshed ($n files) for $appVersion")
+            true
+        }.getOrElse { Log.w(TAG, "brain refresh failed", it); false }
+    }
 
     /** Does THIS build actually bundle a runtime for this device's ABI? (arm64 only.) */
     fun isBundled(ctx: Context): Boolean =
