@@ -35,10 +35,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -115,6 +121,13 @@ class OverlayController(private val appCtx: Context) :
     private var pointerView: ComposeView? = null
     private val clearPointer = Runnable { detachPointer() }
     private val ui = mutableStateOf(OverlayUi())
+
+    /** Wired by the service. [onMic] = stop any speech + listen again; [onSend] = a typed message;
+     *  [onDismiss] = the popup was dismissed (stop speech + listening). */
+    var onMic: () -> Unit = {}
+    var onSend: (String) -> Unit = {}
+    var onDismiss: () -> Unit = {}
+
     private val confirmResult = ArrayBlockingQueue<Pair<Boolean, String?>>(1)
     private val confirmPending = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var pendingAction: String = ""
@@ -187,7 +200,7 @@ class OverlayController(private val appCtx: Context) :
         attach()
         main.postDelayed(settle, 2200)
     }
-    fun hide() = onMain { main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
+    fun hide() = onMain { runCatching { onDismiss() }; main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
 
     /** Briefly show a pointing Clawd at SCREEN pixel (x,y) — the spot Clyde is about to tap — so device
      *  automation is visible/auditable (a Gemini-can't). NOT_TOUCHABLE, so it never intercepts the tap. */
@@ -304,16 +317,23 @@ class OverlayController(private val appCtx: Context) :
                     onApprove = { resolveConfirm(true) },
                     onDeny = { resolveConfirm(false) },
                     onClose = { hide() },
+                    onMic = { onMic() },
+                    onSend = { onSend(it) },
                 )
             }
         }
+        // NOT NOT_FOCUSABLE: the window must be focusable so the typed-message field can take focus and
+        // raise the soft keyboard. ADJUST_RESIZE lifts the bottom panel above the keyboard. Voice stays
+        // first — the keyboard only appears if the user taps the text field.
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_DIM_BEHIND,
+            WindowManager.LayoutParams.FLAG_DIM_BEHIND,
             PixelFormat.TRANSLUCENT,
         )
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED
         params.dimAmount = 0.30f
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
@@ -361,7 +381,7 @@ class OverlayController(private val appCtx: Context) :
 // ─────────────────────────── overlay UI ───────────────────────────
 
 @Composable
-private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit) {
+private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit, onMic: () -> Unit, onSend: (String) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         // tap-outside: dismiss (summon) / deny (confirm)
         Box(
@@ -371,7 +391,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
             ) { if (ui.mode == OverlayMode.Confirm) onDeny() else onClose() }
         )
         when (ui.mode) {
-            OverlayMode.Summon -> SummonPanel(ui, onClose)
+            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend)
             OverlayMode.Confirm -> ConfirmPanel(ui, onApprove, onDeny)
             OverlayMode.Hidden -> {}
         }
@@ -379,8 +399,9 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onClose: () -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit) {
     var shown by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { shown = true }
     val anim by animateFloatAsState(if (shown) 1f else 0f, tween(if (reduceMotion()) 0 else 300), label = "summon")
     Box(
@@ -424,9 +445,35 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             ) {
                 VoiceLight()
                 Spacer(Modifier.size(10.dp))
-                Text(ui.status.ifBlank { "Listening" }, fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Ink, modifier = Modifier.weight(1f))
-                Box(Modifier.size(36.dp).background(ClydeColor.Blue, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Mic, contentDescription = "mic", tint = Color(0xFF06303C), modifier = Modifier.size(18.dp))
+                // Type a message OR tap the mic. The button is Send when there's text, else the mic
+                // (which stops any speech and listens again — so it never just closes the popup).
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = TextStyle(fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Ink),
+                    cursorBrush = SolidColor(ClydeColor.Blue),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        val t = text.trim(); if (t.isNotEmpty()) { onSend(t); text = "" }
+                    }),
+                    decorationBox = { inner ->
+                        if (text.isEmpty()) Text("Ask, or type a message", fontFamily = Body, fontSize = 14.sp, color = ClydeColor.Muted)
+                        inner()
+                    },
+                )
+                Spacer(Modifier.size(8.dp))
+                val t = text.trim()
+                Box(
+                    Modifier.size(36.dp).background(ClydeColor.Blue, RoundedCornerShape(18.dp))
+                        .pressable(label = if (t.isEmpty()) "Listen again" else "Send") {
+                            if (t.isEmpty()) onMic() else { onSend(t); text = "" }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (t.isEmpty()) Icon(Icons.Filled.Mic, contentDescription = "listen again", tint = Color(0xFF06303C), modifier = Modifier.size(18.dp))
+                    else Text("↑", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF06303C))
                 }
             }
         }

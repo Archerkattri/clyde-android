@@ -49,6 +49,12 @@ class AgentOrchestratorService : Service() {
         super.onCreate()
         voice = VoiceIO(this)
         overlay = OverlayController(applicationContext)
+        // Mic button: stop any speech, reset to Listening, and listen again (never just close).
+        overlay.onMic = { voice.stopSpeaking(); overlay.showSummon(); startListening() }
+        // Typed message: stop speech + listening, show it, and send to the brain.
+        overlay.onSend = { t -> voice.stopSpeaking(); voice.stopListening(); overlay.transcript(t); handle(t) }
+        // Dismissed (tapped outside / closed): stop talking and listening.
+        overlay.onDismiss = { voice.stopSpeaking(); voice.stopListening() }
         startInForeground()
         startServer()
         maybeStartEmbeddedBrain()
@@ -128,15 +134,21 @@ class AgentOrchestratorService : Service() {
             overlay.answer("Brain offline:\n${BrainRunner.diag.take(600).ifBlank { "no output captured" }}")
             return
         }
+        startListening()
+    }
+
+    /** Start (or restart) a voice-listen cycle. Reused by the assist trigger and the mic button. */
+    private fun startListening() {
         voice.listen(
             onPartial = { overlay.transcript(it) },
             onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
             onError = { err ->
-                overlay.status(when (err) {
+                // Don't nag on a silent timeout — just go quiet; the mic button restarts listening.
+                if (err != "no-speech") overlay.status(when (err) {
                     "mic-permission" -> "Mic access is off — enable it for Clyde in Settings"
                     "network" -> "No connection for speech recognition"
                     "speech recognition unavailable" -> "Speech isn't available on this device"
-                    else -> "Didn't catch that — try again"
+                    else -> "Didn't catch that — tap the mic to try again"
                 })
                 Log.w(TAG, "Speech recognition error: $err")
             },

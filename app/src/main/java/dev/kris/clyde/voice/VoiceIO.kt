@@ -65,6 +65,9 @@ class VoiceIO(private val ctx: Context) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clyde-${System.identityHashCode(text)}")
     }
 
+    /** Interrupt any ongoing speech immediately (tapping mic / sending a new message / dismissing). */
+    fun stopSpeaking() = onMain { tts?.stop() }
+
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             onError("speech recognition unavailable")
