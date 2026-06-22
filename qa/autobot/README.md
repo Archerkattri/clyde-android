@@ -51,10 +51,12 @@ Each flow gets a verdict (✅ PASS / ⚠️ PARTIAL / ❌ FAIL / ⛔ BLOCKED) wi
   once** before running; AutoBot will mark the login-dependent flows BLOCKED if it isn't signed in.
 - **The power-button assist gesture can't be triggered** by ADB cleanly, so AutoBot summons the popup via
   the in-app **"Ask Clyde"** button instead.
-- **First run may need a nudge.** This harness was written against mobile-mcp's documented tool names but
-  hasn't been run against a physical phone from the build machine — if a tool name or the `--allowedTools`
-  form differs on your mobile-mcp version, the script prints the error; tell me and I'll adjust (or try
-  `--permission-mode bypassPermissions` for a fully autonomous run).
+- **Plumbing is validated (on an emulator).** The mobile-mcp tool names, the `--allowedTools` list, and the
+  `claude -p` driving loop are confirmed working — the UI-only emulator mode ran end-to-end and critiqued
+  Clyde's screens. The physical-phone `run.sh` uses the same plumbing; only phone-specific behavior is
+  still unverified from the build machine. If anything differs on your mobile-mcp version the script
+  prints the error — tell me and I'll adjust (or try `--permission-mode bypassPermissions` for a fully
+  autonomous run).
 - It only allows the **mobile-mcp** tools — it can tap/type/screenshot your phone, nothing on your computer.
 
 ## Tuning
