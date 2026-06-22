@@ -21,12 +21,15 @@ const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 // page shows it for copy-paste. This URL is registered for the client (the localhost loopback, with a
 // port, is what claude.ai rejects after approval on mobile).
 const MANUAL_REDIRECT_URL = "https://platform.claude.com/oauth/code/callback";
-// The claude.ai OAuth scopes (the CLI's CLAUDE_AI_OAUTH_SCOPES / dH8 set), DELIBERATELY WITHOUT
-// `org:create_api_key`. That extra scope is org-admin (mint an API key) — accounts that aren't org
-// admins (personal / edu / managed) can't grant it, so claude.ai rejects the whole grant AFTER the
-// user taps Approve ("invalid request format"). Clyde is subscription-only and must never create an
-// API key, so we drop it on principle too. These five are what a subscription token actually needs.
-const SCOPE = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+// EXACTLY what `claude setup-token` requests — a single `user:inference` scope (the CLI's
+// inferenceOnly path). setup-token is the PROVEN headless subscription flow: claude.ai authorize +
+// this manual redirect + this one scope → a long-lived token the Agent SDK runs on. The broader
+// claude.ai scope set (sessions/mcp/file_upload/profile, and certainly org:create_api_key) gets the
+// whole grant REFUSED at the Approve step on a normal subscription account, so we mirror setup-token
+// verbatim instead. Clyde only needs inference anyway (subscription-only, never an API key).
+const SCOPE = "user:inference";
+// setup-token asks for a 1-year token (vs the default ~1h); sent on the token exchange.
+const TOKEN_EXPIRES_IN = 31536000;
 
 const b64url = (b: Buffer): string => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
@@ -85,7 +88,7 @@ export async function submitCode(input: string): Promise<{ ok: boolean; error?: 
 async function exchange(code: string, verifier: string, redirectUri: string, state: string): Promise<Record<string, unknown>> {
   // Body mirrors the CLI's exchange exactly — `state` is required alongside the PKCE verifier, and the
   // redirect_uri MUST match the one sent to /authorize (the manual redirect).
-  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state };
+  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state, expires_in: TOKEN_EXPIRES_IN };
   const r = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
