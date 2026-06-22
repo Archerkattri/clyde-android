@@ -35,7 +35,7 @@ class AgentOrchestratorService : Service() {
         private const val CHANNEL = "clyde_orchestrator"
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
-        private const val BRAIN_VERSION = "0.1.0" // bump to force the embedded runtime to re-extract
+        private const val BRAIN_VERSION = "0.1.0" // structural runtime version (node/CLI/libs layout)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -60,10 +60,19 @@ class AgentOrchestratorService : Service() {
         if (!EmbeddedRuntime.isBundled(applicationContext)) return
         scope.launch(Dispatchers.IO) {
             if (EmbeddedRuntime.ensureInstalled(applicationContext, BRAIN_VERSION)) {
+                // Always pull the latest brain from THIS APK (keyed on app version) so a brain fix
+                // ships without re-unpacking the whole runtime. Without this the brain went stale.
+                EmbeddedRuntime.refreshBrain(applicationContext, appVersionTag())
                 brain.start(Prefs.clydeKey)
             }
         }
     }
+
+    /** A stable per-build tag (the app's versionCode) used to refresh the bundled brain on update. */
+    private fun appVersionTag(): String = runCatching {
+        val pi = applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0)
+        "v${pi.longVersionCode}"
+    }.getOrDefault(BRAIN_VERSION)
 
     private fun startServer() {
         if (server != null) return
