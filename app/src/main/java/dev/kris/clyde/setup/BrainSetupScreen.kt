@@ -308,7 +308,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                 Text("Signed in on your subscription.", fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Muted)
             } else {
                 Text(
-                    "Tap below — Clyde opens Claude in your browser. Approve, then copy the code Claude shows you and paste it back here. Clyde never sees your password.",
+                    "Tap below — Clyde opens Claude in your browser, you authorize, and you're in. No password or token to copy; Clyde never sees them.",
                     fontFamily = Body, fontSize = 13.sp, lineHeight = 18.sp, color = ClydeColor.Muted,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -322,7 +322,7 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                                     val url = BrainClient.startLogin()
                                     if (url != null) {
                                         dev.kris.clyde.util.Browser.openDefault(ctx, url)
-                                        loginStatus = "approve in Claude, copy the code it shows, paste it below"
+                                        loginStatus = "authorize in your browser, then come back here"
                                     } else {
                                         loginStatus = "couldn't start sign-in — wait for the brain (step 3), then retry"
                                     }
@@ -336,34 +336,30 @@ private fun EmbeddedBrainSetup(onConnected: () -> Unit, onSkip: () -> Unit) {
                     Text(loginStatus, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
                 }
 
-                // Paste the auth code Claude shows after you approve, then exchange it for a full token.
+                // Fallback: paste a token (for when the in-browser sign-in can't reach the device callback).
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    "After approving, paste the code Claude gives you:",
-                    fontFamily = Body, fontSize = 12.5f.sp, lineHeight = 16.sp, color = ClydeColor.Muted,
+                    "Trouble? Run  claude setup-token  on a computer with Claude Code and paste the token:",
+                    fontFamily = Body, fontSize = 11.5f.sp, lineHeight = 16.sp, color = ClydeColor.Muted,
                 )
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = code, onValueChange = { code = it }, singleLine = true,
-                    label = { Text("paste code", fontFamily = Body, fontSize = 12.sp) },
+                    label = { Text("paste token (optional)", fontFamily = Body, fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(6.dp))
                 Box(
                     Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(9.dp))
-                        .pressable(label = "Complete sign-in") {
+                        .pressable(label = "Save token") {
                             if (code.isNotBlank()) {
-                                val pasted = code.trim()
-                                loginStatus = "signing in…"
-                                scope.launch {
-                                    val err = BrainClient.submitCode(pasted)
-                                    if (err == null) { code = ""; signedIn = true; loginStatus = "signed in ✓" }
-                                    else loginStatus = err
-                                }
+                                Prefs.oauthToken = code.trim(); code = ""; signedIn = true
+                                val i = Intent(ctx, AgentOrchestratorService::class.java).setAction(AgentOrchestratorService.ACTION_RESTART_BRAIN)
+                                runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i) }
                             }
                         }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) { Text("Complete sign-in", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText) }
+                ) { Text("Save token", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.BlueText) }
             }
         }
         Spacer(Modifier.height(12.dp))

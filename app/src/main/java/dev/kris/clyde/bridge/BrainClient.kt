@@ -70,8 +70,7 @@ object BrainClient {
         }
     }
 
-    /** Start sign-in; returns the authorize URL to open in the browser, or null. After the user
-     *  approves, claude.ai shows a code to paste back via [submitCode]. */
+    /** Start the no-paste loopback sign-in; returns the authorize URL to open in the browser, or null. */
     suspend fun startLogin(): String? = withContext(Dispatchers.IO) {
         try {
             val c = open("/auth/login/start", "POST")
@@ -85,26 +84,6 @@ object BrainClient {
             if (j.optBoolean("ok")) j.optString("url").ifBlank { null } else null
         } catch (_: Exception) {
             null
-        }
-    }
-
-    /** Complete sign-in with the code copied from claude.ai's code page (accepts `code` or `code#state`).
-     *  Returns null on success, or a short error message the UI can surface. */
-    suspend fun submitCode(code: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val c = open("/auth/login/code", "POST")
-            c.doOutput = true
-            c.readTimeout = 20_000
-            c.setRequestProperty("Content-Type", "application/json")
-            c.outputStream.use { it.write(JSONObject().put("code", code).toString().toByteArray()) }
-            val body = runCatching {
-                (if (c.responseCode in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() }
-            }.getOrDefault("")
-            c.disconnect()
-            val j = runCatching { JSONObject(body) }.getOrNull()
-            if (j?.optBoolean("ok") == true) null else (j?.optString("error").orEmpty().ifBlank { "sign-in failed — try again" })
-        } catch (_: Exception) {
-            "couldn't reach the brain — wait for it to come online, then retry"
         }
     }
 

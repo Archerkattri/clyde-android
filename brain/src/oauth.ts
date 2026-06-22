@@ -1,39 +1,30 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Subscription sign-in done entirely in the brain (Node) — no terminal/PTY, which is why the
- * interactive `claude login` CLI can't run on-device. This replicates claude-code's OWN `login` OAuth
- * (same client + endpoints + scopes), but uses its MANUAL redirect rather than a localhost loopback.
- *
- * Why manual, not loopback: on a phone, claude.ai will not complete the post-approval hand-off back to
- * a `http://localhost:<port>/callback` server (the loopback only works on desktop). So we send users
- * through the same path `claude login` falls back to — redirect to platform.claude.com's code page,
- * which DISPLAYS the auth code; the user pastes it into Clyde and the brain exchanges it (PKCE) for a
- * full subscription token written to ~/.claude/.credentials.json (the file the Agent SDK reads).
- * Subscription token only; no API key. The app opens the URL, takes the pasted code, and polls status.
+ * No-paste subscription sign-in, done entirely in the brain (Node) — no terminal/PTY needed, which is
+ * why the interactive CLI can't do it on-device. This replicates claude-code's OWN loopback OAuth flow
+ * (the same client + endpoints the CLI uses for `claude` login): start a localhost callback server,
+ * open the authorize URL in the phone browser, the browser redirects back to the local server with an
+ * auth code, we exchange it (PKCE) and write ~/.claude/.credentials.json — the exact file the Agent SDK
+ * reads + auto-refreshes. Subscription token only; no API key. The app just opens the URL and polls.
  */
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
-// The manual redirect the CLI uses when no loopback is available: claude.ai sends the code here and the
-// page shows it for copy-paste. This URL is registered for the client (the localhost loopback, with a
-// port, is what claude.ai rejects after approval on mobile).
-const MANUAL_REDIRECT_URL = "https://platform.claude.com/oauth/code/callback";
-// EXACTLY what `claude setup-token` requests — a single `user:inference` scope (the CLI's
-// inferenceOnly path). setup-token is the PROVEN headless subscription flow: claude.ai authorize +
-// this manual redirect + this one scope → a long-lived token the Agent SDK runs on. The broader
-// claude.ai scope set (sessions/mcp/file_upload/profile, and certainly org:create_api_key) gets the
-// whole grant REFUSED at the Approve step on a normal subscription account, so we mirror setup-token
-// verbatim instead. Clyde only needs inference anyway (subscription-only, never an API key).
+// Single `user:inference` scope — EXACTLY what `claude setup-token` requests (captured + verified
+// end-to-end: this scope over the loopback redirect returns an auth code; the broader set that
+// includes `org:create_api_key` makes claude.ai REJECT the grant after Approve with "invalid request
+// format", because that scope is org-admin and most accounts can't grant it). Inference is all the
+// brain needs (subscription-only; never an API key). The redirect MUST be the loopback below — the
+// `platform.claude.com/oauth/code/callback` manual redirect also gets rejected on the claude.ai flow.
 const SCOPE = "user:inference";
-// setup-token asks for a 1-year token (vs the default ~1h); sent on the token exchange.
-const TOKEN_EXPIRES_IN = 31536000;
 
 const b64url = (b: Buffer): string => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-interface Pending { verifier: string; state: string; redirectUri: string; }
+interface Pending { server: Server; verifier: string; state: string; redirectUri: string; }
 let pending: Pending | null = null;
 let lastError = "";
 
@@ -44,51 +35,67 @@ export function loginStatus(): { signedIn: boolean; pending: boolean; error: str
   return { signedIn: existsSync(credsPath()), pending: pending !== null, error: lastError };
 }
 
-/** Begin sign-in: returns the authorize URL for the app to open in the browser. No loopback server —
- *  after approval claude.ai shows a code the user pastes back via submitCode(). */
+/** Start the loopback OAuth: returns the authorize URL for the app to open in the browser. */
 export async function startLogin(): Promise<{ url: string }> {
+  if (pending) { try { pending.server.close(); } catch { /* ignore */ } pending = null; }
   lastError = "";
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash("sha256").update(verifier).digest());
   const state = b64url(randomBytes(16));
-  pending = { verifier, state, redirectUri: MANUAL_REDIRECT_URL };
 
-  const u = new URL(AUTHORIZE_URL);
-  const params: Record<string, string> = {
-    code: "true", client_id: CLIENT_ID, response_type: "code",
-    redirect_uri: MANUAL_REDIRECT_URL, scope: SCOPE,
-    code_challenge: challenge, code_challenge_method: "S256", state,
-  };
-  for (const k of Object.keys(params)) u.searchParams.set(k, params[k]);
-  return { url: u.toString() };
+  return new Promise<{ url: string }>((resolveP, reject) => {
+    const server = createServer((req, res) => { void handleCallback(req, res); });
+    server.on("error", (e) => reject(e));
+    server.listen(0, "127.0.0.1", () => {
+      const a = server.address();
+      const port = a && typeof a === "object" ? a.port : 0;
+      const redirectUri = `http://localhost:${port}/callback`;
+      pending = { server, verifier, state, redirectUri };
+      const u = new URL(AUTHORIZE_URL);
+      const params: Record<string, string> = {
+        code: "true", client_id: CLIENT_ID, response_type: "code",
+        redirect_uri: redirectUri, scope: SCOPE,
+        code_challenge: challenge, code_challenge_method: "S256", state,
+      };
+      for (const k of Object.keys(params)) u.searchParams.set(k, params[k]);
+      resolveP({ url: u.toString() });
+    });
+    // don't leak the listener if the user never finishes
+    setTimeout(() => { if (pending?.server === server) { try { server.close(); } catch { /* ignore */ } pending = null; } }, 600_000);
+  });
 }
 
-/** Complete sign-in with the code the user copied from claude.ai's code page. The page shows the value
- *  as `code#state` (mirrors how the CLI parses it); we accept either `code` or `code#state`. */
-export async function submitCode(input: string): Promise<{ ok: boolean; error?: string }> {
+async function handleCallback(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const p = pending;
-  if (!p) { lastError = "no sign-in in progress — start again"; return { ok: false, error: lastError }; }
-  const trimmed = input.trim();
-  const code = trimmed.split("#")[0];
-  const gotState = trimmed.includes("#") ? trimmed.split("#")[1] : undefined;
-  if (!code) { lastError = "no code in the pasted value"; return { ok: false, error: lastError }; }
-  if (gotState && gotState !== p.state) { lastError = "state mismatch — start sign-in again"; return { ok: false, error: lastError }; }
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const page = (msg: string): void => {
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><body style="font-family:system-ui;text-align:center;padding:3em;background:#FAF9F5;color:#141413"><h2>${msg}</h2><p style="color:#73706A">You can close this tab and return to Clyde.</p></body>`);
+  };
+  if (!url.pathname.startsWith("/callback")) { res.writeHead(404); res.end(); return; }
+  const code = url.searchParams.get("code");
+  const gotState = url.searchParams.get("state");
+  if (!p || !code || gotState !== p.state) {
+    lastError = "callback rejected (state mismatch or missing code)";
+    page("Sign-in failed — please try again in Clyde.");
+    return;
+  }
   try {
     const tok = await exchange(code, p.verifier, p.redirectUri, p.state);
     writeCreds(tok);
-    pending = null;
-    lastError = "";
-    return { ok: true };
+    page("Signed in to Claude ✓");
   } catch (e) {
     lastError = `token exchange failed: ${(e as Error).message}`;
-    return { ok: false, error: lastError };
+    page("Sign-in failed — please try again in Clyde.");
+  } finally {
+    try { p?.server.close(); } catch { /* ignore */ }
+    pending = null;
   }
 }
 
 async function exchange(code: string, verifier: string, redirectUri: string, state: string): Promise<Record<string, unknown>> {
-  // Body mirrors the CLI's exchange exactly — `state` is required alongside the PKCE verifier, and the
-  // redirect_uri MUST match the one sent to /authorize (the manual redirect).
-  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state, expires_in: TOKEN_EXPIRES_IN };
+  // Body mirrors the CLI's exchange exactly — note `state` is required alongside the PKCE verifier.
+  const body = { grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: CLIENT_ID, code_verifier: verifier, state };
   const r = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
