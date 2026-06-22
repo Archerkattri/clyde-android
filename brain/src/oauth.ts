@@ -41,7 +41,11 @@ export async function startLogin(): Promise<{ url: string }> {
   lastError = "";
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash("sha256").update(verifier).digest());
-  const state = b64url(randomBytes(16));
+  // MUST be 32 bytes (→43-char base64url), matching `claude` CLI exactly. claude.ai's authorize
+  // endpoint REJECTS a shorter state (the old 16-byte/22-char value) as "invalid request format"
+  // AFTER the user taps Approve. This single difference was why every in-app sign-in failed while
+  // the real CLI / setup-token (32-byte state) always worked. Verified by side-by-side URL diff.
+  const state = b64url(randomBytes(32));
 
   return new Promise<{ url: string }>((resolveP, reject) => {
     const server = createServer((req, res) => { void handleCallback(req, res); });
