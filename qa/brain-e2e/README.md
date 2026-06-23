@@ -19,7 +19,7 @@ $env:CLYDE_KEY="clyde-e2e-test-key-001"; $env:APP_PORT="8766"; node mock-app.mjs
 
 # 2) brain (terminal B) — token via env, NEVER commit it; API key must be unset
 $env:CLYDE_KEY="clyde-e2e-test-key-001"; $env:APP_PORT="8766"
-$env:CLAUDE_CODE_OAUTH_TOKEN="<your sk-ant-oat01-... from `claude setup-token`>"
+$env:CLAUDE_CODE_OAUTH_TOKEN="<your subscription token from `claude setup-token`>"
 Remove-Item Env:\ANTHROPIC_API_KEY -EA SilentlyContinue
 cd ../../brain; npx tsx src/server.ts
 
