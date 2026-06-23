@@ -33,8 +33,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 37
-        versionName = "0.1.36"
+        versionCode = 38
+        versionName = "0.1.37"
         vectorDrawables { useSupportLibrary = true }
         // arm64-only by design (the embedded brain's libnode.so is arm64; the bootstrap is aarch64).
         // The x86_64 UI-test emulator runs arm64 via translation, so this doesn't affect that path.
@@ -104,9 +104,7 @@ dependencies {
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-text-google-fonts")
 
     implementation("androidx.activity:activity-compose:1.13.0")

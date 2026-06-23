@@ -39,8 +39,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.SolidColor
@@ -578,7 +576,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (t.isEmpty()) Icon(Icons.Filled.Mic, contentDescription = "listen again", tint = Color(0xFF06303C), modifier = Modifier.size(18.dp))
+                    if (t.isEmpty()) Icon(painterResource(R.drawable.ic_mic), contentDescription = "listen again", tint = Color(0xFF06303C), modifier = Modifier.size(18.dp))
                     else Text("↑", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF06303C))
                 }
             }

@@ -40,10 +40,6 @@ const noResume = new Set<string>(); // app sessions whose SDK resume failed once
 let activeQuery: ReturnType<typeof query> | null = null;
 let haltCurrent: (() => void) | null = null; // halts the CURRENT turn only (per-turn, not global)
 
-export function getSafety(): Safety {
-  return safety;
-}
-
 /** Kill switch: drop tokens, halt the in-flight turn, and interrupt it (best-effort). */
 export function haltActiveTurn(): void {
   safety.invalidateAll();

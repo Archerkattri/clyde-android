@@ -8,7 +8,7 @@ import android.os.Build
 import android.util.Log
 
 /** Fires Termux's RUN_COMMAND intent. Requires com.termux.permission.RUN_COMMAND and
- *  Termux `allow-external-apps=true`. Used to launch `claude login` and the one-shot brain query. */
+ *  Termux `allow-external-apps=true`. Used by the companion build to sync the loopback key to Termux. */
 object TermuxRunCommand {
     private const val TERMUX = "com.termux"
     private const val RUN_SERVICE = "com.termux.app.RunCommandService"
@@ -37,9 +37,6 @@ object TermuxRunCommand {
         val i = ctx.packageManager.getLaunchIntentForPackage(TERMUX) ?: return false
         ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
     }.getOrDefault(false)
-
-    /** Opens a visible Termux session running `claude login` so the user can finish OAuth. */
-    fun startClaudeLogin(ctx: Context): Boolean = runInTermux(ctx, "claude login", background = false)
 
     fun runInTermux(ctx: Context, command: String, background: Boolean): Boolean {
         val intent = Intent().apply {

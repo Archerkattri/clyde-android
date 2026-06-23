@@ -1,105 +1,18 @@
 package dev.kris.clyde.runtime
 
 import android.content.Context
-import android.util.Log
-import java.io.BufferedReader
 import java.io.File
-import java.io.OutputStreamWriter
-import kotlin.concurrent.thread
 
 /**
- * Drives a one-time subscription sign-in inside the embedded runtime — clean-room, plain
- * ProcessBuilder. Runs the JS claude-code CLI's login in `$HOME` = files/home, so the credentials it
- * writes (under `$HOME/.claude`) are the SAME ones the brain uses (BrainRunner runs with the same
- * HOME). Nothing here ever sees the password/token — Claude's own OAuth handles it in the browser.
- *
- * It's a general interactive driver (streams stdout, surfaces any https URL for the app to open in a
- * browser tab, and can feed a pasted code to stdin) so it's robust to the exact CLI prompts.
+ * Subscription sign-in *state* for the embedded runtime. The actual login is brain-driven (the brain's
+ * loopback OAuth via BrainClient, or a pasted `setup-token`); this only reports whether credentials
+ * exist — under `$HOME/.claude` (the brain runs with the same HOME) or as a pasted token in Prefs.
  */
 class ClaudeAuth(private val ctx: Context) {
-    private val tag = "ClydeRuntime"
-    @Volatile private var proc: Process? = null
-    @Volatile private var stdin: OutputStreamWriter? = null
-
-    /** Last ~14 lines the CLI printed — the real reason shown to the user if sign-in fails. */
-    @Volatile var outputTail: String = ""; private set
-    private val tail = ArrayDeque<String>()
-    private fun pushLine(line: String) {
-        synchronized(tail) { tail.addLast(line); while (tail.size > 14) tail.removeFirst(); outputTail = tail.joinToString("\n") }
-    }
-
-    private val prefix get() = EmbeddedRuntime.prefixDir(ctx)
     private val home get() = EmbeddedRuntime.homeDir(ctx)
-    private val cli get() = File(prefix, "lib/node_modules/@anthropic-ai/claude-code/cli.js")
-    private val urlRegex = Regex("""https?://[^\s'"]+""")
-
-    fun isRunning(): Boolean = proc?.isAlive == true
-
-    /**
-     * Start the login. [onLine] gets each output line; [onUrl] fires for the first OAuth URL seen
-     * (open it in a browser); [onResult] fires when the process exits (true = exit 0).
-     */
-    @Synchronized
-    fun start(onLine: (String) -> Unit, onUrl: (String) -> Unit, onResult: (Boolean) -> Unit) {
-        if (isRunning()) return
-        synchronized(tail) { tail.clear(); outputTail = "" }
-        if (!cli.exists()) { outputTail = "claude CLI missing at ${cli.absolutePath}"; Log.w(tag, outputTail); onResult(false); return }
-        try {
-            val node = EmbeddedRuntime.nodeBin(ctx)
-            val prefixPath = prefix.absolutePath
-            // `setup-token` / `login` performs the subscription OAuth and stores creds under $HOME/.claude.
-            val pb = ProcessBuilder(node.absolutePath, cli.absolutePath, "setup-token")
-            pb.directory(home.also { it.mkdirs() })
-            pb.redirectErrorStream(true)
-            pb.environment().apply {
-                put("PREFIX", prefixPath)
-                put("HOME", home.absolutePath)
-                put("TMPDIR", File(prefix, "tmp").apply { mkdirs() }.absolutePath)
-                put("PATH", "$prefixPath/bin:" + (get("PATH") ?: ""))
-                // node + native libs run from nativeLibraryDir (exec-allowed); no LD_PRELOAD (W^X).
-                put("LD_LIBRARY_PATH", "${EmbeddedRuntime.nativeLibDir(ctx).absolutePath}:$prefixPath/lib")
-                put("LANG", "en_US.UTF-8")
-                remove("ANTHROPIC_API_KEY")
-            }
-            val p = pb.start()
-            proc = p
-            stdin = OutputStreamWriter(p.outputStream)
-            var urlSent = false
-            thread(name = "clyde-auth-out", isDaemon = true) {
-                p.inputStream.bufferedReader().use { r: BufferedReader ->
-                    r.forEachLine { line ->
-                        pushLine(line)
-                        onLine(line)
-                        if (!urlSent) urlRegex.find(line)?.let { urlSent = true; onUrl(it.value) }
-                    }
-                }
-            }
-            thread(name = "clyde-auth-wait", isDaemon = true) {
-                val ok = runCatching { p.waitFor() == 0 }.getOrDefault(false)
-                proc = null
-                onResult(ok)
-            }
-            Log.i(tag, "claude login started")
-        } catch (e: Exception) {
-            outputTail = "couldn't start: ${e.javaClass.simpleName}: ${e.message ?: ""}"
-            Log.e(tag, "claude login failed to start", e)
-            onResult(false)
-        }
-    }
-
-    /** Feed a pasted code (or any input) to the login process's stdin. */
-    fun submit(text: String) {
-        runCatching { stdin?.apply { write(text); write("\n"); flush() } }
-    }
 
     /** True once a subscription token is pasted, or the brain's home holds Claude credentials. */
     fun isSignedIn(): Boolean =
         dev.kris.clyde.util.Prefs.oauthToken.isNotBlank() ||
             File(home, ".claude/.credentials.json").exists() || File(home, ".claude.json").exists()
-
-    @Synchronized
-    fun cancel() {
-        runCatching { proc?.destroy() }
-        proc = null
-    }
 }
