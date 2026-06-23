@@ -36,5 +36,28 @@ export function makeMetaTools(ctx: ToolCtx) {
         return text(JSON.stringify({ approved: true, token }));
       }
     ),
+
+    tool(
+      "ask_user",
+      "Ask the user ONE multiple-choice question and wait for their answer. Clyde shows the options on screen; the user answers by voice or by tapping. Use this whenever you need them to choose or clarify (which app, which of several results, an ambiguous target) instead of asking in prose. Ask EXACTLY ONE question per call and wait for the reply before asking another — never bundle questions. Give 2–6 short options and make the LAST one a free-form catch-all like \"Something else\": if the user says something that matches none of the other options, Clyde selects that catch-all and returns their spoken words in `userSaid`. The result has `choice` (the chosen option's label) and `userSaid` (their verbatim words — important when they pick the catch-all); if `answered` is false the user dismissed the question, so don't keep pressing — proceed sensibly or stop.",
+      {
+        question: z.string().describe("the single question to ask, in the user's own terms"),
+        options: z
+          .array(z.string())
+          .min(2)
+          .max(6)
+          .describe("2–6 short choices; make the LAST one a free-form catch-all like \"Something else\""),
+      },
+      async (a) => {
+        const options = a.options.map((o) => String(o));
+        const r = await ctx.app.ask({ question: a.question, options });
+        if (!r.ok || !r.result) return err(`could not show the question: ${r.error ?? "no response"}`);
+        const ans = r.result;
+        if (ans.cancelled) return text(JSON.stringify({ answered: false }));
+        return text(
+          JSON.stringify({ answered: true, choice: ans.label, index: ans.index, userSaid: ans.text, via: ans.via })
+        );
+      }
+    ),
   ];
 }

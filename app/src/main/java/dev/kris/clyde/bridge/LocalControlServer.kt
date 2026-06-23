@@ -23,6 +23,9 @@ class LocalControlServer(
     private val voice: VoiceIO,
     private val key: String,
     private val confirmHandler: (summary: String, details: String?, action: String, params: JSONObject) -> Pair<Boolean, String?>,
+    // Ask the user ONE multiple-choice question (answerable by voice or tap); blocks until they answer.
+    // Returns {index,label,text,via,cancelled}.
+    private val askHandler: (question: String, options: List<String>) -> JSONObject,
     private val overlayStatus: (text: String, state: String?) -> Unit,
     // Non-destructive token check; the token is only burned (invalidate) after the action SUCCEEDS,
     // so a denied permission or failed fire never costs the user a fresh approval.
@@ -146,6 +149,14 @@ class LocalControlServer(
                         body.optJSONObject("params") ?: JSONObject(),
                     )
                     ok(JSONObject().put("approved", approved).also { if (token != null) it.put("token", token) })
+                }
+                uri == "/ask" -> {
+                    val q = body.optString("question")
+                    val arr = body.optJSONArray("options")
+                    val options = ArrayList<String>()
+                    if (arr != null) for (i in 0 until arr.length()) arr.optString(i).takeIf { it.isNotBlank() }?.let { options.add(it) }
+                    if (q.isBlank() || options.size < 2) err("ask needs a question and at least 2 options")
+                    else ok(askHandler(q, options))
                 }
                 uri == "/gemini/delegate" -> {
                     val token = body.optString("token")

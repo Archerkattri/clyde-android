@@ -90,7 +90,7 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
-enum class OverlayMode { Hidden, Summon, Confirm }
+enum class OverlayMode { Hidden, Summon, Confirm, Ask }
 
 data class OverlayUi(
     val mode: OverlayMode = OverlayMode.Hidden,
@@ -103,7 +103,16 @@ data class OverlayUi(
     val confirmSummary: String = "",
     val confirmDetails: String? = null,
     val confirmEffect: String = "",
+
+    // ask_user: one multiple-choice question answered by voice or tap.
+    val askQuestion: String = "",
+    val askOptions: List<String> = emptyList(),
+    val askTranscript: String = "", // live partial speech while choosing
+    val askHighlight: Int = -1, // option the current speech matches (live feedback), -1 = none
 )
+
+/** The user's answer to an ask_user question — by voice (verbatim words in [text]) or by tapping. */
+data class AskAnswer(val index: Int, val label: String, val text: String, val via: String, val cancelled: Boolean)
 
 /** Hosts the summon/confirm overlay in a WindowManager window (Compose + lifecycle owners). */
 class OverlayController(private val appCtx: Context) :
@@ -135,11 +144,21 @@ class OverlayController(private val appCtx: Context) :
     var onMic: () -> Unit = {}
     var onSend: (String) -> Unit = {}
     var onDismiss: () -> Unit = {}
+    /** ask_user hooks (wired by the service): [onAskShown] starts a voice-listen for the choice;
+     *  [onAskClosed] stops it once the question resolves (tap / voice / dismiss). */
+    var onAskShown: (question: String, options: List<String>) -> Unit = { _, _ -> }
+    var onAskClosed: () -> Unit = {}
 
     private val confirmResult = ArrayBlockingQueue<Pair<Boolean, String?>>(1)
     private val confirmPending = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var pendingAction: String = ""
     @Volatile private var pendingParams: JSONObject = JSONObject()
+
+    // ask_user uses the same park/resolve bridge as confirm: the NanoHTTPD worker blocks in
+    // askBlocking() until a tap (UI) or a voice match (service) resolves it. Serialized via askPending.
+    private val askResult = ArrayBlockingQueue<AskAnswer>(1)
+    private val askPending = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var pendingOptions: List<String> = emptyList()
 
     // Bind to a hash of ALL approved (non-token) args — mirrors the brain's argsHash so the app's
     // independent check is exactly as strong: an empty/partial approval can't authorize a populated
@@ -199,6 +218,7 @@ class OverlayController(private val appCtx: Context) :
     fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text) }
     fun status(text: String) = onMain {
         if (dismissed) return@onMain
+        if (ui.value.mode == OverlayMode.Confirm || ui.value.mode == OverlayMode.Ask) return@onMain // don't clobber an active modal
         main.removeCallbacks(settle)
         // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
         val sc = overlayScene(text)
@@ -302,6 +322,88 @@ class OverlayController(private val appCtx: Context) :
         }
     }
 
+    /** Ask the user ONE multiple-choice question — blocks the calling (NanoHTTPD worker) thread until
+     *  they answer (tap or voice) or dismiss/timeout. Mirrors [confirmBlocking]; [onAskShown] tells the
+     *  service to start listening for a spoken choice. */
+    fun askBlocking(question: String, options: List<String>): AskAnswer {
+        if (dismissed) return AskAnswer(-1, "", "", "dismiss", true) // popup closed → don't reopen
+        if (!askPending.compareAndSet(false, true)) return AskAnswer(-1, "", "", "busy", true)
+        pendingOptions = options
+        askResult.clear()
+        onMain {
+            main.removeCallbacks(settle)
+            ui.value = ui.value.copy(
+                mode = OverlayMode.Ask, askQuestion = question, askOptions = options,
+                askTranscript = "", askHighlight = -1, answer = "", status = "Listening", scene = "",
+                clawd = ClawdState.Listening,
+            )
+            attach()
+            syncWindowMode() // a question must be tappable — never pass touches through
+            runCatching { onAskShown(question, options) } // service starts the voice-listen (after the UI is up)
+        }
+        return try {
+            val r = askResult.poll(150, TimeUnit.SECONDS)
+            when {
+                r != null -> r // a tap/voice/cancel delivered a result (it already released askPending)
+                askPending.compareAndSet(true, false) -> { clearAskUi(); runCatching { onAskClosed() }; AskAnswer(-1, "", "", "timeout", true) }
+                else -> askResult.poll(2, TimeUnit.SECONDS) ?: AskAnswer(-1, "", "", "timeout", true)
+            }
+        } catch (_: InterruptedException) {
+            askPending.compareAndSet(true, false)
+            AskAnswer(-1, "", "", "timeout", true)
+        }
+    }
+
+    /** Tap on an option chip → resolve with that option (via "tap"). */
+    fun pickAsk(index: Int) {
+        val opts = pendingOptions
+        if (index in opts.indices) resolveAsk(AskAnswer(index, opts[index], opts[index], "tap", false))
+    }
+
+    /** Voice match (from the service): the user said [said], which resolved to option [index]. For the
+     *  no-match / catch-all case the service passes the LAST option index and the verbatim [said]. */
+    fun answerAskByVoice(index: Int, said: String) {
+        val opts = pendingOptions
+        if (index in opts.indices) resolveAsk(AskAnswer(index, opts[index], said, "voice", false))
+    }
+
+    /** Dismissed (tap-outside / back) → resolve cancelled so the brain's /ask returns promptly. */
+    fun cancelAsk() = resolveAsk(AskAnswer(-1, "", "", "dismiss", true))
+
+    /** Live feedback while the user speaks: the partial transcript and which option it currently matches. */
+    fun updateAskTranscript(text: String, highlight: Int) = onMain {
+        if (ui.value.mode != OverlayMode.Ask) return@onMain
+        ui.value = ui.value.copy(askTranscript = text, askHighlight = highlight)
+    }
+
+    /** True while a question is on screen awaiting an answer (guards the service's voice-listen loop). */
+    fun isAsking(): Boolean = askPending.get()
+
+    private fun resolveAsk(answer: AskAnswer) {
+        if (!askPending.compareAndSet(true, false)) return // first resolver wins; ignore late tap/voice
+        askResult.offer(answer)
+        onMain {
+            ui.value = ui.value.copy(
+                mode = OverlayMode.Summon, askQuestion = "", askOptions = emptyList(),
+                askTranscript = "", askHighlight = -1,
+                status = if (answer.cancelled) "Cancelled" else "Working",
+                clawd = if (answer.cancelled) ClawdState.Idle else ClawdState.Working,
+            )
+            syncWindowMode()
+        }
+        runCatching { onAskClosed() } // stop the voice-listen
+    }
+
+    private fun clearAskUi() = onMain {
+        if (ui.value.mode == OverlayMode.Ask)
+            ui.value = ui.value.copy(mode = OverlayMode.Summon, askQuestion = "", askOptions = emptyList(), askTranscript = "", askHighlight = -1)
+    }
+
+    /** Unpark a worker blocked in [askBlocking] with a cancel — used on KILL / teardown. */
+    fun cancelPendingAsk() {
+        if (askPending.compareAndSet(true, false)) askResult.offer(AskAnswer(-1, "", "", "dismiss", true))
+    }
+
     /** What the approval ACTUALLY authorizes, built from the params the token is bound to (never the
      *  brain's prose summary) — so the user reads the real URL / number / recipient, not a spoofable
      *  caption. A compromised or prompt-injected brain can't show one thing and authorize another. */
@@ -351,6 +453,8 @@ class OverlayController(private val appCtx: Context) :
                     onClose = { hide() },
                     onMic = { onMic() },
                     onSend = { onSend(it) },
+                    onAskPick = { pickAsk(it) },
+                    onAskCancel = { cancelAsk() },
                 )
             }
         }
@@ -359,7 +463,11 @@ class OverlayController(private val appCtx: Context) :
         cv.isFocusableInTouchMode = true
         cv.setOnKeyListener { _, keyCode, event ->
             if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
-                if (ui.value.mode == OverlayMode.Confirm) resolveConfirm(false) else hide()
+                when (ui.value.mode) {
+                    OverlayMode.Confirm -> resolveConfirm(false)
+                    OverlayMode.Ask -> cancelAsk()
+                    else -> hide()
+                }
                 true
             } else false
         }
@@ -481,18 +589,25 @@ class OverlayController(private val appCtx: Context) :
 // ─────────────────────────── overlay UI ───────────────────────────
 
 @Composable
-private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit, onMic: () -> Unit, onSend: (String) -> Unit) {
+private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit, onMic: () -> Unit, onSend: (String) -> Unit, onAskPick: (Int) -> Unit, onAskCancel: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        // tap-outside: dismiss (summon) / deny (confirm)
+        // tap-outside: dismiss (summon) / deny (confirm) / cancel (ask)
         Box(
             Modifier.fillMaxSize().clickable(
                 indication = null,
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-            ) { if (ui.mode == OverlayMode.Confirm) onDeny() else onClose() }
+            ) {
+                when (ui.mode) {
+                    OverlayMode.Confirm -> onDeny()
+                    OverlayMode.Ask -> onAskCancel()
+                    else -> onClose()
+                }
+            }
         )
         when (ui.mode) {
             OverlayMode.Summon -> SummonPanel(ui, onMic, onSend)
             OverlayMode.Confirm -> ConfirmPanel(ui, onApprove, onDeny)
+            OverlayMode.Ask -> AskPanel(ui, onAskPick)
             OverlayMode.Hidden -> {}
         }
     }
@@ -673,6 +788,80 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
                     Modifier.weight(1.4f).background(ClydeColor.Blue, RoundedCornerShape(11.dp)).pressable(label = "Approve") { onApprove() }.padding(vertical = 13.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text("Approve", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF06303C)) }
+            }
+        }
+    }
+}
+
+/** ask_user: one question + tappable numbered options, answerable by voice or tap. Blue (live/listening)
+ *  rather than terracotta (confirm) — a question isn't a consequence. The last option is the free-form
+ *  catch-all: if the user says something matching no option, the service routes it here with their words.
+ *  [ui.askHighlight] highlights the option the live speech currently matches. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.AskPanel(ui: OverlayUi, onPick: (Int) -> Unit) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val anim by animateFloatAsState(if (shown) 1f else 0f, tween(if (reduceMotion()) 0 else 300), label = "ask")
+    Box(
+        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)
+            .graphicsLayer { translationY = (1f - anim) * 60f; alpha = anim },
+    ) {
+        ClawdView(state = ClawdState.Listening, size = 54.dp, modifier = Modifier.align(Alignment.TopCenter).offset(y = (-28).dp))
+        Column(
+            Modifier.fillMaxWidth().padding(top = 24.dp)
+                .background(ClydeColor.Paper, RoundedCornerShape(22.dp))
+                .border(1.dp, ClydeColor.Blue, RoundedCornerShape(22.dp))
+                .padding(18.dp),
+        ) {
+            Text("CLYDE ASKS", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted)
+            Spacer(Modifier.height(8.dp))
+            Text(ui.askQuestion, fontFamily = Serif, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 25.sp, color = ClydeColor.Ink)
+            Spacer(Modifier.height(14.dp))
+            ui.askOptions.forEachIndexed { i, opt ->
+                val hot = i == ui.askHighlight
+                val isOther = i == ui.askOptions.lastIndex && ui.askOptions.size >= 2
+                val onBlue = Color(0xFF06303C)
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        .background(if (hot) ClydeColor.Blue else ClydeColor.Panel2, RoundedCornerShape(12.dp))
+                        .border(1.dp, if (hot) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(12.dp))
+                        .pressable(label = opt) { onPick(i) }
+                        .padding(horizontal = 13.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier.size(22.dp)
+                            .background(if (hot) onBlue else ClydeColor.Paper, RoundedCornerShape(11.dp))
+                            .border(1.dp, if (hot) onBlue else ClydeColor.Line2, RoundedCornerShape(11.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("${i + 1}", fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (hot) ClydeColor.Blue else ClydeColor.Muted) }
+                    Spacer(Modifier.size(11.dp))
+                    Text(
+                        opt, fontFamily = Body, fontSize = 15.sp,
+                        fontWeight = if (hot) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (hot) onBlue else ClydeColor.Ink,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    if (isOther) {
+                        Spacer(Modifier.size(8.dp))
+                        Text("say anything", fontFamily = Mono, fontSize = 9.sp, color = if (hot) onBlue else ClydeColor.Muted)
+                    }
+                }
+            }
+            Spacer(Modifier.height(2.dp))
+            // Listening indicator + live transcript so the user sees they can talk (and what's heard).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                VoiceLight()
+                Spacer(Modifier.size(10.dp))
+                val heard = ui.askTranscript.isNotBlank()
+                Text(
+                    if (heard) ui.askTranscript else "Listening… say an option, or tap one",
+                    fontFamily = if (heard) Display else Mono,
+                    fontWeight = if (heard) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = if (heard) 15.sp else 11.sp,
+                    color = if (heard) ClydeColor.Ink else ClydeColor.Muted,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
             }
         }
     }

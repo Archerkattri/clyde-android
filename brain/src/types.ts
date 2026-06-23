@@ -36,6 +36,15 @@ export interface ConfirmResult {
   token?: string;
 }
 
+/** Result of asking the user one multiple-choice question (answered by voice or tap, or dismissed). */
+export interface AskResult {
+  index: number; // chosen option index (0-based), or -1 if cancelled
+  label: string; // the chosen option's label
+  text: string; // the user's verbatim words (voice) or the tapped label
+  via: string; // "voice" | "tap" | "dismiss" | "timeout"
+  cancelled: boolean;
+}
+
 /** Result of running a shell command (rish / su / termux-*). */
 export interface ShellResult {
   ok: boolean;

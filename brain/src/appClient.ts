@@ -1,5 +1,5 @@
 import { config } from "./config";
-import type { AppCaps, AppResult, ConfirmResult } from "./types";
+import type { AppCaps, AppResult, ConfirmResult, AskResult } from "./types";
 
 /** Thin client for the app's LocalControlServer on 127.0.0.1:8766. */
 export class AppClient {
@@ -99,5 +99,11 @@ export class AppClient {
    *  `action` lets the app bind the issued token to this tool (defense-in-depth). */
   confirm(b: { summary: string; details?: string; action: string; params?: Record<string, unknown> }) {
     return this.req<ConfirmResult>("POST", "/confirm", b, 120000);
+  }
+  /** Ask the user ONE multiple-choice question; blocks until they answer (voice or tap) or dismiss.
+   *  The app shows the options and lets the user speak or tap; a spoken answer that matches no option
+   *  resolves to the last ("Other") option, with the words carried back in `text`. */
+  ask(b: { question: string; options: string[] }) {
+    return this.req<AskResult>("POST", "/ask", b, 200000);
   }
 }

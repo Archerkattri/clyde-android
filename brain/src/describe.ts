@@ -36,6 +36,7 @@ export function describeAction(tool: string, p: Record<string, unknown> = {}): A
     case "grant_signature_perm": return { summary: `Grant ${s("permission")} to ${s("pkg")}` };
     case "delegate_to_gemini":
       return { summary: "Send the following to Google Gemini (a different vendor than Claude)", details: s("prompt") };
+    case "ask_user": return { summary: `Asking: ${s("question")}` };
     default: return { summary: tool.replace(/_/g, " ") };
   }
 }
