@@ -111,6 +111,12 @@ function handle(uri, body) {
   if (uri === "/speak") return ok({});
   if (uri === "/overlay/status") return ok({});
   if (uri === "/confirm") return ok({ approved: true, token: "tok_mock_" + Math.floor(Math.random() * 1e9) });
+  if (uri === "/ask") {
+    // Auto-answer with the first option so ask_user flows proceed (like /confirm auto-approves).
+    const options = Array.isArray(body.options) ? body.options.map(String) : [];
+    if (options.length) return ok({ index: 0, label: options[0], text: options[0], via: "tap", cancelled: false });
+    return ok({ index: -1, label: "", text: "", via: "dismiss", cancelled: true });
+  }
   if (uri === "/gemini/delegate") return ok({ delegated: true });
   if (uri === "/ping") return ok({ pong: true });
   return err("not found: " + uri);
