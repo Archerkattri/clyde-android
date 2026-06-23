@@ -33,8 +33,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 29
-        versionName = "0.1.28"
+        versionCode = 30
+        versionName = "0.1.29"
         vectorDrawables { useSupportLibrary = true }
     }
 
