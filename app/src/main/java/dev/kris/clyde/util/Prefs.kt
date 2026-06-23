@@ -28,6 +28,7 @@ object Prefs {
     private const val KEY_MODEL = "assistant_model"
     private const val KEY_DEFAULT_APPS = "default_apps" // JSON {category: package}
     private const val KEY_REMINDERS = "reminders"       // JSON array of {id,text,fireAt,action,createdAt}
+    private const val KEY_WAKE_WORD = "wake_word"       // "Hey Clyde" hotword (off by default)
     private const val KS_ALIAS = "clyde_prefs_aeskey"
     private const val ANDROID_KS = "AndroidKeyStore"
 
@@ -71,6 +72,11 @@ object Prefs {
     var reminders: String
         get() = sp.getString(KEY_REMINDERS, "[]") ?: "[]"
         set(value) = sp.edit().putString(KEY_REMINDERS, value).apply()
+
+    /** "Hey Clyde" on-device wake word. Off by default (continuous mic = battery; opt-in). */
+    var wakeWord: Boolean
+        get() = sp.getBoolean(KEY_WAKE_WORD, false)
+        set(value) = sp.edit().putBoolean(KEY_WAKE_WORD, value).apply()
 
     /** The subscription CLAUDE_CODE_OAUTH_TOKEN (from desktop `claude setup-token`), encrypted at rest
      *  under the same TEE Keystore key as the loopback secret. "" when not set. */

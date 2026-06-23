@@ -48,6 +48,7 @@ import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.AgentOrchestratorService
+import dev.kris.clyde.wake.WakeWordService
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeLogo
@@ -204,6 +205,40 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             "Opus — most capable · Sonnet — balanced · Haiku — fastest",
             fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
         )
+
+        Spacer(Modifier.height(16.dp))
+        Eyebrow("hands-free")
+        Spacer(Modifier.height(6.dp))
+        var wake by remember { mutableStateOf(Prefs.wakeWord) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+                .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+                .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("“Hey Clyde” wake word", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Ink)
+                Text(
+                    if (wake) "Listening for “Hey Clyde”. Downloads a ~40 MB voice model once."
+                    else "Say “Hey Clyde” to summon — off by default (uses the mic + battery).",
+                    fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
+                )
+            }
+            Box(
+                Modifier
+                    .background(if (wake) ClydeColor.Blue else Color.Transparent, RoundedCornerShape(9.dp))
+                    .then(if (wake) Modifier else Modifier.border(1.dp, ClydeColor.Line2, RoundedCornerShape(9.dp)))
+                    .pressable(label = if (wake) "Turn off Hey Clyde" else "Turn on Hey Clyde") {
+                        wake = !wake
+                        Prefs.wakeWord = wake
+                        if (wake) WakeWordService.startIfEnabled(ctx) else WakeWordService.stop(ctx)
+                    }
+                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(if (wake) "On" else "Off", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (wake) Color(0xFF06303C) else ClydeColor.Muted) }
+        }
 
         Spacer(Modifier.height(18.dp))
         PrimaryButton("Ask Clyde", onClick = onAsk)

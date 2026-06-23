@@ -112,6 +112,12 @@
                 android:value="Conversational on-device assistant orchestrator" />
         </service>
 
+        <!-- "Hey Clyde" on-device wake word (Vosk). Off by default; holds the mic only when enabled. -->
+        <service
+            android:name=".wake.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <!-- Tier-1 hands: accessibility engine. -->
         <service
             android:name=".service.PhoneControlAccessibilityService"

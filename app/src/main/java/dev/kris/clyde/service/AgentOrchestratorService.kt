@@ -18,6 +18,7 @@ import dev.kris.clyde.runtime.BrainRunner
 import dev.kris.clyde.runtime.EmbeddedRuntime
 import dev.kris.clyde.util.Prefs
 import dev.kris.clyde.voice.VoiceIO
+import dev.kris.clyde.wake.WakeWordService
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +57,12 @@ class AgentOrchestratorService : Service() {
         overlay.onMic = { voice.stopSpeaking(); overlay.showSummon(); startListening() }
         // Typed message: stop speech + listening, show it, and send to the brain.
         overlay.onSend = { t -> voice.stopSpeaking(); voice.stopListening(); overlay.transcript(t); handle(t) }
-        // Dismissed (tapped outside / closed): stop talking and listening.
-        overlay.onDismiss = { voice.stopSpeaking(); voice.stopListening() }
+        // Dismissed (tapped outside / closed): stop talking and listening, and re-arm the hotword.
+        overlay.onDismiss = { voice.stopSpeaking(); voice.stopListening(); WakeWordService.resume() }
         startInForeground()
         startServer()
         maybeStartEmbeddedBrain()
+        WakeWordService.startIfEnabled(this) // arm "Hey Clyde" if the user turned it on (foreground start)
     }
 
     /** If this build bundles the embedded runtime, extract it once and run the brain in-process.
@@ -147,6 +149,7 @@ class AgentOrchestratorService : Service() {
     }
 
     private fun beginAssist() {
+        WakeWordService.pause() // free the mic for the command (resumed when the overlay is dismissed)
         voice.stopSpeaking() // re-summoning while Clyde is talking cuts it off and listens fresh
         overlay.showSummon()
         // If the embedded brain hasn't come up, show its startup diagnostics immediately instead of
