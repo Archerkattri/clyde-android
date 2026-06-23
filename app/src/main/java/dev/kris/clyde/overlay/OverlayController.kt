@@ -39,7 +39,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -332,6 +331,15 @@ class OverlayController(private val appCtx: Context) :
                 )
             }
         }
+        // Back gesture / back button dismisses the popup (the focusable window receives the key);
+        // in a confirm, back denies — same as tapping outside.
+        cv.isFocusableInTouchMode = true
+        cv.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
+                if (ui.value.mode == OverlayMode.Confirm) resolveConfirm(false) else hide()
+                true
+            } else false
+        }
         // NOT NOT_FOCUSABLE: the window must be focusable so the typed-message field can take focus and
         // raise the soft keyboard. ADJUST_RESIZE lifts the bottom panel above the keyboard. Voice stays
         // first — the keyboard only appears if the user taps the text field.
@@ -401,7 +409,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
             ) { if (ui.mode == OverlayMode.Confirm) onDeny() else onClose() }
         )
         when (ui.mode) {
-            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend, onClose)
+            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend)
             OverlayMode.Confirm -> ConfirmPanel(ui, onApprove, onDeny)
             OverlayMode.Hidden -> {}
         }
@@ -409,7 +417,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit, onClose: () -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit) {
     var shown by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { shown = true }
@@ -437,11 +445,6 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                 Icon(painterResource(R.drawable.ic_claude_mark), contentDescription = null, tint = ClydeColor.TerracottaDeep, modifier = Modifier.size(11.dp))
                 Spacer(Modifier.size(4.dp))
                 Text("Claude", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.TerracottaDeep)
-                Spacer(Modifier.size(12.dp))
-                Box(
-                    Modifier.size(26.dp).pressable(label = "Close") { onClose() },
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Close, contentDescription = "close", tint = ClydeColor.Muted, modifier = Modifier.size(18.dp)) }
             }
             Spacer(Modifier.height(10.dp))
             when {
