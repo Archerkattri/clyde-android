@@ -87,7 +87,7 @@ object DeviceQueries {
             .distinctBy { it.second }
             .filter { f.isBlank() || it.first.lowercase().contains(f) }
             .sortedBy { it.first.lowercase() }
-            .take(80)
+            .take(200) // generous cap; Claude can also pass a filter to narrow a big list
             .forEach { apps.put(JSONObject().put("label", it.first).put("package", it.second)) }
         return JSONObject().put("apps", apps)
     }

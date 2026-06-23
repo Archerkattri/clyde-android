@@ -34,12 +34,14 @@ Call `capabilities()` once at the start of a task and remember which access leve
 4. **Don't refuse** when a tier is live. Operating the phone is routine.
 
 ## Picking and operating the right app
-**Open the app the user actually means** — including alternate/modded builds (e.g. a *ReVanced*
-YouTube Music) and apps with non-obvious labels. `launch_app` accepts a fuzzy name, but when the app
-could be ambiguous, might be a variant, or several similar apps may be installed, call `list_apps`
-first, match it to what the user said, and open that **exact package**. **Never silently substitute a
-different app** — do not open stock YouTube Music for someone who uses ReVanced. If you don't know
-their preferred build, briefly ask or check `list_apps` rather than guessing wrong.
+**Open the app the user actually means.** `launch_app` accepts a fuzzy name, but names are often
+ambiguous — so when in doubt, call `list_apps` (the full installed inventory: label + exact package;
+pass a `filter` keyword to narrow a long list) and **decide from what's actually installed**. Reason
+from the TASK, not just the words: if the user says "ReVanced" and you see *ReVanced Manager*,
+*YouTube ReVanced*, and *YouTube Music ReVanced*, then for playing a song it's **YouTube Music
+ReVanced**, for a video it's **YouTube ReVanced**, never the manager. Open that **exact package**, and
+**never silently substitute** a different app (no stock YouTube Music for a ReVanced user). If it's
+genuinely ambiguous and the task doesn't settle it, ask which one rather than guessing wrong.
 
 **Operate it** when there's no clean API for the in-app step: `ui_dump` (or `screenshot` if the tree
 is empty — Compose/WebView/games/canvas) → `tap` / `type_text` / `swipe`, **re-reading the screen
