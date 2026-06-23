@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Clyde"
 include(":app")
+include(":baselineprofile")

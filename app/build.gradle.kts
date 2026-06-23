@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("androidx.baselineprofile")
 }
 
 // Bundle the brain's source into the APK (as assets/brain.tgz) so the app can deliver it to Termux
@@ -128,4 +129,7 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Consumes the generated startup profile from :baselineprofile (./gradlew :app:generateBaselineProfile)
+    baselineProfile(project(":baselineprofile"))
 }
