@@ -45,6 +45,7 @@ import dev.kris.clyde.bridge.BrainClient
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.overlay.ClawdSceneView
 import dev.kris.clyde.runtime.EmbeddedRuntime
+import dev.kris.clyde.runtime.CodexAuth
 import dev.kris.clyde.bridge.TermuxRunCommand
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.AgentOrchestratorService
@@ -177,34 +178,41 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
         } // end: brain-key card (companion build only)
 
         Spacer(Modifier.height(16.dp))
-        Eyebrow("assistant model")
+        Eyebrow("brain")
         Spacer(Modifier.height(6.dp))
-        var model by remember { mutableStateOf(Prefs.assistantModel) }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
-                .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf("opus" to "Opus", "sonnet" to "Sonnet", "haiku" to "Haiku").forEach { (id, label) ->
-                val sel = model == id
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .background(if (sel) ClydeColor.Blue else Color.Transparent, RoundedCornerShape(9.dp))
-                        .then(if (sel) Modifier else Modifier.pressable(label = "Use $label") { model = id; Prefs.assistantModel = id })
-                        .padding(vertical = 9.dp),
-                    contentAlignment = Alignment.Center,
-                ) { Text(label, fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (sel) Color(0xFF06303C) else ClydeColor.Muted) }
-            }
-        }
+        var backend by remember { mutableStateOf(Prefs.backend) }
+        Segmented(
+            options = listOf("claude" to "Claude", "codex" to "Codex"),
+            selected = backend,
+            onSelect = { backend = it; Prefs.backend = it },
+        )
+        Spacer(Modifier.height(8.dp))
+        Eyebrow("model")
+        Spacer(Modifier.height(6.dp))
+        var claudeModel by remember { mutableStateOf(Prefs.assistantModel) }
+        var codexModel by remember { mutableStateOf(Prefs.codexModel) }
+        val models = if (backend == "codex")
+            listOf("gpt-5.4" to "GPT-5.4", "gpt-5.4-mini" to "Mini", "gpt-5.3-codex" to "Codex")
+        else
+            listOf("opus" to "Opus", "sonnet" to "Sonnet", "haiku" to "Haiku")
+        Segmented(
+            options = models,
+            selected = if (backend == "codex") codexModel else claudeModel,
+            onSelect = {
+                if (backend == "codex") { codexModel = it; Prefs.codexModel = it }
+                else { claudeModel = it; Prefs.assistantModel = it }
+            },
+        )
         Spacer(Modifier.height(5.dp))
         Text(
-            "Opus — most capable · Sonnet — balanced · Haiku — fastest",
+            if (backend == "codex") "Codex runs on your ChatGPT subscription · GPT-5.4 default"
+            else "Opus — most capable · Sonnet — balanced · Haiku — fastest",
             fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
         )
+        if (backend == "codex") {
+            Spacer(Modifier.height(10.dp))
+            CodexSignIn()
+        }
 
         Spacer(Modifier.height(16.dp))
         Eyebrow("hands-free")
@@ -278,6 +286,73 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) { Text("Stop Clyde · revoke tokens", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ClydeColor.Danger) }
     }
+    }
+}
+
+/** Codex (ChatGPT subscription) sign-in — runs `codex login` in the embedded runtime, opens the OAuth
+ *  page in the real default browser, and shows the device code. No-op until the codex binary ships. */
+@Composable
+private fun CodexSignIn() {
+    val ctx = LocalContext.current
+    val auth = remember { CodexAuth(ctx) }
+    val signedIn = remember { auth.isSignedIn() }
+    var active by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxWidth()
+            .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+            .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+    ) {
+        Text("Codex sign-in", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ClydeColor.Ink)
+        Spacer(Modifier.height(6.dp))
+        if (signedIn) {
+            Text("Signed in on your ChatGPT subscription.", fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+        } else {
+            Box(
+                Modifier.background(ClydeColor.Blue, RoundedCornerShape(9.dp))
+                    .pressable(label = "Sign in to Codex") {
+                        if (!active) {
+                            active = true; status = "starting…"
+                            auth.start(
+                                onLine = { status = it.trim().take(90) }, // the device code prints here
+                                onUrl = { url -> dev.kris.clyde.util.Browser.openDefault(ctx, url) },
+                                onResult = { ok -> active = false; status = if (ok) "signed in" else "sign-in didn't complete — try again" },
+                            )
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) { Text(if (active) "Signing in…" else "Sign in to Codex", fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF06303C)) }
+            if (status.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(status, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted)
+            }
+        }
+    }
+}
+
+/** A pill segmented control: options are (id, label); the selected id is filled blue. */
+@Composable
+private fun Segmented(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ClydeColor.Panel2, RoundedCornerShape(12.dp))
+            .border(1.dp, ClydeColor.Line, RoundedCornerShape(12.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (id, label) ->
+            val sel = selected == id
+            Box(
+                Modifier
+                    .weight(1f)
+                    .background(if (sel) ClydeColor.Blue else Color.Transparent, RoundedCornerShape(9.dp))
+                    .then(if (sel) Modifier else Modifier.pressable(label = "Use $label") { onSelect(id) })
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(label, fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (sel) Color(0xFF06303C) else ClydeColor.Muted) }
+        }
     }
 }
 
