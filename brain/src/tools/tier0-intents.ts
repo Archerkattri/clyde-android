@@ -25,7 +25,11 @@ export function makeTier0Intents(ctx: ToolCtx) {
         query: z.string().describe('what to play, e.g. "Let Down by Radiohead"'),
         package: z.string().optional().describe("exact package to play in (from list_apps), e.g. a ReVanced build; omit to let the system choose"),
       },
-      async (a) => fire("play_media", a, `Playing ${a.query}.`)
+      async (a) => fire(
+        "play_media",
+        a,
+        `Sent a play-from-search for "${a.query}". This OFTEN ONLY OPENS the app without playing — do NOT assume it worked. Read the screen now; if nothing is playing, find the search field, type "${a.query}", open the top result, and press play via the UI.`
+      )
     ),
 
     tool(

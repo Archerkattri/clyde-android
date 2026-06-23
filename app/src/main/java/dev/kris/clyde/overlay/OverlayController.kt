@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -446,6 +447,8 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                 Spacer(Modifier.size(4.dp))
                 Text("Claude", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.TerracottaDeep)
             }
+            Spacer(Modifier.height(8.dp))
+            ActivityLine(ui)
             Spacer(Modifier.height(10.dp))
             when {
                 ui.answer.isNotBlank() -> Row(Modifier.height(IntrinsicSize.Min)) {
@@ -455,7 +458,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                     Text(ui.answer, fontFamily = Serif, fontSize = 16.sp, lineHeight = 23.sp, color = ClydeColor.Ink)
                 }
                 ui.transcript.isNotBlank() -> Text(ui.transcript, fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = ClydeColor.Ink)
-                else -> Text(ui.status.ifBlank { "Listening" }, fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = ClydeColor.Muted)
+                else -> {} // the ActivityLine above carries the live status now
             }
             Spacer(Modifier.height(12.dp))
             Row(
@@ -592,6 +595,39 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPanel(ui: Overlay
             }
         }
     }
+}
+
+/** Claude-Code-style live status: a state dot + one short line of exactly what Clyde is doing right
+ *  now (listening / thinking / the current action), so it's never a mystery before the screen changes. */
+@Composable
+private fun ActivityLine(ui: OverlayUi) {
+    val (label, color, active) = when (ui.clawd) {
+        ClawdState.Listening -> Triple("Listening…", ClydeColor.Blue, true)
+        ClawdState.Working, ClawdState.Navigating -> Triple(ui.status.ifBlank { "Working…" }, ClydeColor.Blue, true)
+        ClawdState.Success -> Triple("Done", Color(0xFF788C5D), false)
+        ClawdState.Error -> Triple(ui.status.ifBlank { "Something went wrong" }, ClydeColor.Terracotta, false)
+        ClawdState.Idle -> Triple(ui.status.ifBlank { "Ready" }, ClydeColor.Muted, false)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        PulseDot(color, active)
+        Spacer(Modifier.size(7.dp))
+        Text(label, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun PulseDot(color: Color, active: Boolean) {
+    if (!active || reduceMotion()) {
+        Box(Modifier.size(7.dp).background(color, RoundedCornerShape(999.dp)))
+        return
+    }
+    val t = rememberInfiniteTransition(label = "dot")
+    val a by t.animateFloat(0.35f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "dotA")
+    Box(
+        Modifier.size(8.dp)
+            .graphicsLayer { alpha = a; scaleX = 0.7f + 0.3f * a; scaleY = 0.7f + 0.3f * a }
+            .background(color, RoundedCornerShape(999.dp)),
+    )
 }
 
 /** Voice-as-light: a blue pool that breathes (amplitude stand-in), not a literal waveform. */
