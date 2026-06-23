@@ -75,5 +75,7 @@ app actions, hallucinated notification summaries (pulled), credibility damage fr
 - **Batch 2** (P1 #6, #9) — shipped **v0.1.43**: general screen-awareness ("what's on my screen" /
   summarize / reply-to-this in any app) + on-device technical help (read logs, explain errors, run
   diagnostics, code help) — capabilities Gemini/Siri structurally lack. System-prompt depth.
-- Next: streaming TTS (latency) + tiered approval/plan-preview + recurring scheduled actions — to be done
-  in batches the user can test on-device between (audio/behavior timing needs a real phone).
+- **Batch 3** (P0 #4 partial — "show your work") — shipped **v0.1.44**: a live step feed during multi-step
+  tasks (prior steps done/green, current pulsing) — agentic transparency Gemini/Siri don't offer.
+- Next: streaming TTS (latency) + tiered approval/plan-preview + recurring scheduled actions — these need
+  on-device iteration (audio/behavior timing), so they come after the user validates v0.1.42–44.

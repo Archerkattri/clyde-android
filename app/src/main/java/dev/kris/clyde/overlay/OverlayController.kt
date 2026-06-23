@@ -113,6 +113,7 @@ data class OverlayUi(
 
     val suggestions: List<String> = emptyList(), // tappable follow-up chips shown under an answer
     val amplitude: Float = 0f, // live mic level 0..1 while listening (drives the voice light)
+    val steps: List<String> = emptyList(), // recent action/status lines — the "show your work" feed
 )
 
 /** The user's answer to an ask_user question — by voice (verbatim words in [text]) or by tapping. */
@@ -226,14 +227,16 @@ class OverlayController(private val appCtx: Context) :
         main.removeCallbacks(settle)
         // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
         val sc = overlayScene(text)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), clawd = ClawdState.Working)
+        // Accumulate a short "show your work" feed: each distinct status/action line, newest last, cap 4.
+        val steps = if (text.isBlank() || ui.value.steps.lastOrNull() == text) ui.value.steps else (ui.value.steps + text).takeLast(4)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), steps = steps, clawd = ClawdState.Working)
         attach()
         syncWindowMode()
     }
     fun answer(text: String) = onMain {
         if (dismissed) return@onMain
         main.removeCallbacks(settle)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", clawd = ClawdState.Success)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", steps = emptyList(), clawd = ClawdState.Success)
         attach()
         syncWindowMode()
         main.postDelayed(settle, 2200)
@@ -259,7 +262,7 @@ class OverlayController(private val appCtx: Context) :
     fun listenAgain() = onMain {
         if (dismissed) return@onMain
         main.removeCallbacks(settle)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = "Listening", clawd = ClawdState.Listening)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = "Listening", steps = emptyList(), clawd = ClawdState.Listening)
         attach()
         syncWindowMode()
     }
@@ -661,7 +664,8 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                 Text("Claude", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.TerracottaDeep)
             }
             Spacer(Modifier.height(8.dp))
-            ActivityLine(ui)
+            // During a multi-step task, show the recent steps ("show your work"); otherwise one status line.
+            if (ui.clawd == ClawdState.Working && ui.steps.size > 1) StepsFeed(ui) else ActivityLine(ui)
             Spacer(Modifier.height(10.dp))
             when {
                 ui.answer.isNotBlank() -> Row(Modifier.height(IntrinsicSize.Min)) {
@@ -914,6 +918,23 @@ private fun ActivityLine(ui: OverlayUi) {
         PulseDot(color, active)
         Spacer(Modifier.size(7.dp))
         Text(label, fontFamily = Mono, fontSize = 11.sp, color = ClydeColor.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** "Show your work": the last few actions Clyde has taken this turn — prior steps marked done (green),
+ *  the current one pulsing. Step-by-step transparency that Gemini/Siri don't offer. */
+@Composable
+private fun StepsFeed(ui: OverlayUi) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ui.steps.forEachIndexed { i, s ->
+            val latest = i == ui.steps.lastIndex
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (latest) PulseDot(ClydeColor.Blue, true)
+                else Box(Modifier.size(6.dp).background(Color(0xFF788C5D), RoundedCornerShape(999.dp)))
+                Spacer(Modifier.size(7.dp))
+                Text(s, fontFamily = Mono, fontSize = 11.sp, color = if (latest) ClydeColor.Ink else ClydeColor.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
