@@ -33,8 +33,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 38
-        versionName = "0.1.37"
+        versionCode = 39
+        versionName = "0.1.38"
         vectorDrawables { useSupportLibrary = true }
         // arm64-only by design (the embedded brain's libnode.so is arm64; the bootstrap is aarch64).
         // The x86_64 UI-test emulator runs arm64 via translation, so this doesn't affect that path.

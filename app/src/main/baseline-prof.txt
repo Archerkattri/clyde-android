@@ -1,0 +1,36 @@
+# Curated baseline profile — Clyde's cold-start + assist hot path. AGP merges this with the Compose
+# libraries' shipped profiles and rewrites it through the R8 mapping; profileinstaller (already on the
+# classpath) installs it at first run, so these classes are AOT-compiled instead of interpreted on the
+# first launch / first summon. Class-level rules only (method-level wants a Macrobenchmark-generated
+# profile on a real device — see the release notes). Unmatched rules are ignored, so this is safe.
+
+# ── cold start ──
+Ldev/kris/clyde/ClydeApp;
+Ldev/kris/clyde/MainActivity;
+Ldev/kris/clyde/util/Prefs;
+Ldev/kris/clyde/runtime/EmbeddedRuntime;
+Ldev/kris/clyde/runtime/BrainRunner;
+Ldev/kris/clyde/runtime/ClaudeAuth;
+Ldev/kris/clyde/caps/CapabilityProbe;
+
+# ── first screen (signed-in → Home; else Login/BrainSetup) + theme ──
+Ldev/kris/clyde/home/HomeScreenKt;
+Ldev/kris/clyde/setup/BrainSetupScreenKt;
+Ldev/kris/clyde/setup/LoginScreenKt;
+Ldev/kris/clyde/setup/SetupScreenKt;
+Ldev/kris/clyde/ui/ThemeKt;
+Ldev/kris/clyde/ui/ColorKt;
+Ldev/kris/clyde/ui/TypographyKt;
+Ldev/kris/clyde/ui/ComponentsKt;
+
+# ── assist hot path: summon → overlay → voice → brain (the core Clyde UX) ──
+Ldev/kris/clyde/assist/AssistEntryActivity;
+Ldev/kris/clyde/service/AgentOrchestratorService;
+Ldev/kris/clyde/service/PhoneControlAccessibilityService;
+Ldev/kris/clyde/overlay/OverlayController;
+Ldev/kris/clyde/overlay/OverlayControllerKt;
+Ldev/kris/clyde/overlay/ClawdViewKt;
+Ldev/kris/clyde/overlay/ClawdSceneKt;
+Ldev/kris/clyde/voice/VoiceIO;
+Ldev/kris/clyde/bridge/BrainClient;
+Ldev/kris/clyde/bridge/LocalControlServer;
