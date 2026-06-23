@@ -14,6 +14,7 @@ import android.util.Base64
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -52,16 +53,34 @@ class PhoneControlAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
-    /** BFS the active window into a compact node list with stable per-dump ids. */
+    /** The top app window that ISN'T Clyde's own overlay — so reads/taps target the real app, never us.
+     *  rootInActiveWindow can be our overlay (it's focusable while listening), which would make Clyde
+     *  read and tap *itself* instead of e.g. the music app — the reason automation went nowhere. */
+    private fun appRoot(self: String): AccessibilityNodeInfo? {
+        val active = rootInActiveWindow
+        if (active != null && active.packageName?.toString() != self) return active
+        return runCatching {
+            windows
+                ?.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                ?.sortedByDescending { it.layer }
+                ?.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() != self } }
+        }.getOrNull() ?: active
+    }
+
+    /** BFS the foreground app window into a compact node list with stable per-dump ids.
+     *  Clyde's own overlay nodes are skipped entirely so the model only ever sees the app it's driving. */
     fun dumpTree(): JSONObject {
         nodeMap.clear()
         val nodes = JSONArray()
         var counter = 0
-        val root = rootInActiveWindow ?: return JSONObject().put("nodes", nodes).put("error", "no active window")
+        val self = packageName
+        val root = appRoot(self) ?: return JSONObject().put("nodes", nodes).put("error", "no active window")
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         while (queue.isNotEmpty() && counter < 500) {
             val n = queue.removeFirst()
+            // never expose Clyde's overlay to the model (defense-in-depth if it merges into the tree)
+            if (n.packageName?.toString() == self) continue
             val id = "n$counter"
             counter++
             nodeMap[id] = n

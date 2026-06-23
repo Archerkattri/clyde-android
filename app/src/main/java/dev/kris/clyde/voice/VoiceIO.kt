@@ -10,6 +10,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 
 /** STT (SpeechRecognizer) + TTS (TextToSpeech). Create/call from the main thread. */
@@ -22,6 +23,9 @@ class VoiceIO(private val ctx: Context) {
     // (dismiss / send / kill) clears it so the recognizer's late callbacks are ignored — otherwise a
     // cancellation error re-ran onError → re-attached the overlay ("popup won't close").
     @Volatile private var sessionActive = false
+    // Fired once when the current utterance finishes naturally (not on stop) — drives "listen again
+    // after Clyde speaks" so a conversation continues without re-summoning. Cleared on stop/interrupt.
+    @Volatile private var speakDone: (() -> Unit)? = null
 
     // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
     // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
@@ -63,14 +67,29 @@ class VoiceIO(private val ctx: Context) {
                 ?.maxByOrNull { it.quality }
         }.getOrNull()
         if (best != null) t.voice = best else t.language = locale
+        t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            // Natural completion → run the one-shot continuation (auto-listen). stop()/interrupt clears
+            // speakDone first, so an interrupted utterance never auto-listens.
+            override fun onDone(utteranceId: String?) {
+                val d = speakDone; speakDone = null
+                if (d != null) main.post { d() }
+            }
+            @Deprecated("kept for older engines") override fun onError(utteranceId: String?) { speakDone = null }
+            override fun onError(utteranceId: String?, errorCode: Int) { speakDone = null }
+        })
     }
 
-    fun speak(text: String) = onMain {
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clyde-${System.identityHashCode(text)}")
+    /** Speak [text]; [onDone] runs once if the utterance finishes naturally (not if interrupted). The
+     *  utteranceId must be non-null for the progress listener to fire onDone. */
+    fun speak(text: String, onDone: () -> Unit = {}) = onMain {
+        speakDone = onDone
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clyde-${System.identityHashCode(text)}-${text.length}")
     }
 
-    /** Interrupt any ongoing speech immediately (tapping mic / sending a new message / dismissing). */
-    fun stopSpeaking() = onMain { tts?.stop() }
+    /** Interrupt any ongoing speech immediately (tapping mic / sending a new message / dismissing).
+     *  Clears the pending continuation so an interrupted answer doesn't also auto-listen. */
+    fun stopSpeaking() = onMain { speakDone = null; tts?.stop() }
 
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
@@ -127,6 +146,7 @@ class VoiceIO(private val ctx: Context) {
     }
 
     fun destroy() {
+        speakDone = null
         recognizer?.destroy()
         recognizer = null
         tts?.stop()

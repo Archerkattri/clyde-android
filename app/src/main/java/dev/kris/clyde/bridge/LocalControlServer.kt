@@ -29,6 +29,8 @@ class LocalControlServer(
     private val invalidateIntentToken: (token: String) -> Unit,
     // Visible automation: flash a pointing Clawd at the screen spot about to be tapped.
     private val pointAt: (x: Int, y: Int) -> Unit,
+    // Capture the screen with Clyde's own overlay hidden, so the shot shows the app, not Clyde's panel.
+    private val screenshot: () -> String?,
 ) : NanoHTTPD("127.0.0.1", PORT) {
 
     companion object {
@@ -71,11 +73,9 @@ class LocalControlServer(
                     it.swipe(body.optInt("x1"), body.optInt("y1"), body.optInt("x2"), body.optInt("y2"), body.optLong("ms", 300))
                 }
                 uri == "/a11y/global" -> a11yBool { it.global(body.optString("action")) }
-                uri == "/a11y/screenshot" -> {
-                    val svc = PhoneControlAccessibilityService.instance
-                    if (svc == null) err("accessibility off")
-                    else svc.screenshotBase64()?.let { ok(JSONObject().put("pngBase64", it)) } ?: err("screenshot failed")
-                }
+                uri == "/a11y/screenshot" ->
+                    screenshot()?.let { ok(JSONObject().put("pngBase64", it)) }
+                        ?: err("screenshot failed (accessibility off, or the screen is FLAG_SECURE)")
                 uri.startsWith("/intent/") -> {
                     val name = uri.removePrefix("/intent/")
                     val needPerm = DeviceIntents.missingPermissionFor(ctx, name)

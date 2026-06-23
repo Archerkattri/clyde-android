@@ -8,6 +8,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -127,6 +128,9 @@ class OverlayController(private val appCtx: Context) :
     // Set true on dismiss so a late event (a brain status/answer or a confirm arriving AFTER the user
     // closed the popup) can't re-attach it; cleared by a fresh user-initiated summon.
     @Volatile private var dismissed = false
+    // True while Clyde is driving the screen: the window passes touches THROUGH to the app and isn't
+    // focused, so injected taps reach the app (not Clyde's own glass) and the screen reads cleanly.
+    @Volatile private var passthrough = false
 
     /** Wired by the service. [onMic] = stop any speech + listen again; [onSend] = a typed message;
      *  [onDismiss] = the popup was dismissed (stop speech + listening). */
@@ -191,6 +195,7 @@ class OverlayController(private val appCtx: Context) :
         dismissed = false
         ui.value = OverlayUi(mode = OverlayMode.Summon, status = "Listening", clawd = ClawdState.Listening)
         attach()
+        syncWindowMode()
     }
 
     fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text) }
@@ -201,13 +206,28 @@ class OverlayController(private val appCtx: Context) :
         val sc = overlayScene(text)
         ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, clawd = ClawdState.Working)
         attach()
+        syncWindowMode()
     }
     fun answer(text: String) = onMain {
         if (dismissed) return@onMain
         main.removeCallbacks(settle)
         ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", clawd = ClawdState.Success)
         attach()
+        syncWindowMode()
         main.postDelayed(settle, 2200)
+    }
+
+    /** True while the popup is on screen (not dismissed) — guards auto-listen after a spoken answer. */
+    fun isShowing(): Boolean = !dismissed
+
+    /** After Clyde finishes speaking, drop back to Listening (keeping the answer visible) so the user
+     *  can reply by voice without re-summoning — a continuous back-and-forth conversation. */
+    fun listenAgain() = onMain {
+        if (dismissed) return@onMain
+        main.removeCallbacks(settle)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = "Listening", clawd = ClawdState.Listening)
+        attach()
+        syncWindowMode()
     }
     fun hide() = onMain { dismissed = true; runCatching { onDismiss() }; main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
 
@@ -255,6 +275,7 @@ class OverlayController(private val appCtx: Context) :
         onMain {
             ui.value = ui.value.copy(mode = OverlayMode.Confirm, confirmSummary = summary, confirmDetails = details, confirmEffect = effectLine(action, params), clawd = ClawdState.Error)
             attach()
+            syncWindowMode() // a confirm must be tappable — never pass touches through
         }
         return try {
             val r = confirmResult.poll(90, TimeUnit.SECONDS)
@@ -311,7 +332,10 @@ class OverlayController(private val appCtx: Context) :
             issuedTokens[token] = IssuedToken(pendingAction, argsHash(pendingParams), System.currentTimeMillis() + tokenTtlMs)
         }
         confirmResult.offer(Pair(approved, token))
-        onMain { ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", scene = "", clawd = if (approved) ClawdState.Working else ClawdState.Idle) }
+        onMain {
+            ui.value = ui.value.copy(mode = OverlayMode.Summon, status = if (approved) "Working" else "Cancelled", scene = "", clawd = if (approved) ClawdState.Working else ClawdState.Idle)
+            syncWindowMode() // approved → resume touch-through automation; denied → stay interactive
+        }
     }
 
     private fun attach() {
@@ -341,33 +365,87 @@ class OverlayController(private val appCtx: Context) :
                 true
             } else false
         }
-        // NOT NOT_FOCUSABLE: the window must be focusable so the typed-message field can take focus and
-        // raise the soft keyboard. ADJUST_RESIZE lifts the bottom panel above the keyboard. Voice stays
-        // first — the keyboard only appears if the user taps the text field.
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_DIM_BEHIND,
-            PixelFormat.TRANSLUCENT,
-        )
-        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-            WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED
-        params.dimAmount = 0.30f
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-                params.blurBehindRadius = (28 * appCtx.resources.displayMetrics.density).toInt()
-            } catch (_: Exception) {
-            }
-        }
         try {
-            wm.addView(cv, params)
+            wm.addView(cv, buildParams())
             view = cv
             lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         } catch (e: Exception) {
             Log.e("Clyde", "overlay addView failed; SYSTEM_ALERT_WINDOW may not be granted", e)
         }
+    }
+
+    /** Window flags for the current mode. When [passthrough] (Clyde is driving the screen) the window
+     *  is NOT_FOCUSABLE + NOT_TOUCHABLE so injected taps reach the app behind and Clyde never reads or
+     *  taps its own glass; otherwise it's interactive (focusable + dim) for voice/typing/approve. */
+    private fun buildParams(): WindowManager.LayoutParams {
+        val flags = if (passthrough)
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        else
+            WindowManager.LayoutParams.FLAG_DIM_BEHIND
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            flags,
+            PixelFormat.TRANSLUCENT,
+        )
+        if (!passthrough) {
+            // Focusable so the typed-message field can raise the keyboard; ADJUST_RESIZE lifts the panel
+            // above it. Voice stays first — the keyboard only appears if the user taps the text field.
+            params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED
+            params.dimAmount = 0.30f
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                    params.blurBehindRadius = (28 * appCtx.resources.displayMetrics.density).toInt()
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return params
+    }
+
+    /** Pass touches through to the app ONLY while actively working (driving the screen); interactive
+     *  in Listening / Confirm / answer so the user can speak, type, or approve. */
+    private fun syncWindowMode() {
+        val u = ui.value
+        setPassthrough(u.mode == OverlayMode.Summon && u.clawd == ClawdState.Working)
+    }
+
+    private fun setPassthrough(p: Boolean) {
+        if (passthrough == p) return
+        passthrough = p
+        val cv = view ?: return
+        runCatching { wm.updateViewLayout(cv, buildParams()) }
+    }
+
+    /** Hide Clyde's own glass for ONE screenshot so the capture shows the app, not Clyde's panel.
+     *  Blocks the calling (worker) thread briefly until the window manager has recomposited without us. */
+    fun beginCapture() {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        onMain {
+            val cv = view
+            if (cv == null) { latch.countDown(); return@onMain }
+            cv.visibility = View.INVISIBLE
+            (cv.layoutParams as? WindowManager.LayoutParams)?.let { lp ->
+                lp.dimAmount = 0f
+                lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND.inv() and
+                    WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+                runCatching { wm.updateViewLayout(cv, lp) }
+            }
+            cv.post { cv.post { latch.countDown() } } // two frames → our content is gone from the buffer
+        }
+        runCatching { latch.await(400, TimeUnit.MILLISECONDS) }
+    }
+
+    fun endCapture() = onMain {
+        val cv = view ?: return@onMain
+        cv.visibility = View.VISIBLE
+        runCatching { wm.updateViewLayout(cv, buildParams()) }
     }
 
     private fun detach() {

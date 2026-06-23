@@ -103,6 +103,12 @@ class AgentOrchestratorService : Service() {
                 validateIntentToken = { token, action, body -> overlay.validateIssuedToken(token, action, body) },
                 invalidateIntentToken = { token -> overlay.invalidateIssuedToken(token) },
                 pointAt = { x, y -> overlay.pointAt(x, y) },
+                // Hide Clyde's own overlay for the capture so the model sees the app, never Clyde's panel.
+                screenshot = {
+                    val svc = PhoneControlAccessibilityService.instance
+                    if (svc == null) null
+                    else { overlay.beginCapture(); try { svc.screenshotBase64() } finally { overlay.endCapture() } }
+                },
             ).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
             Log.i(TAG, "LocalControlServer up on 127.0.0.1:${LocalControlServer.PORT}")
         } catch (e: Exception) {
@@ -127,6 +133,7 @@ class AgentOrchestratorService : Service() {
     }
 
     private fun beginAssist() {
+        voice.stopSpeaking() // re-summoning while Clyde is talking cuts it off and listens fresh
         overlay.showSummon()
         // If the embedded brain hasn't come up, show its startup diagnostics immediately instead of
         // falling into voice-listen → connection-refused → generic "something went wrong" message.
@@ -155,6 +162,14 @@ class AgentOrchestratorService : Service() {
         )
     }
 
+    /** When Clyde finishes speaking, listen for a reply automatically — so it's a back-and-forth
+     *  conversation, no re-summoning between turns. If the user says nothing, it just goes quiet. */
+    private fun onSpeechFinished() {
+        if (!overlay.isShowing()) return // user dismissed while it was talking → don't reopen the mic
+        overlay.listenAgain()
+        startListening()
+    }
+
     private fun handle(text: String) {
         overlay.status("Thinking…")
         scope.launch {
@@ -164,14 +179,14 @@ class AgentOrchestratorService : Service() {
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
                     "need_confirm" -> overlay.status(ev.optString("summary").ifBlank { "Waiting for your OK…" })
                     // ignore a blank final (e.g. a turn that ended with no answer) — keep the last status
-                    "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) }
+                    "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) { onSpeechFinished() } }
                     "error" -> {
                         val detail = ev.optString("detail").trim()
                         Log.w(TAG, "brain error: ${ev.optString("text")} | detail=$detail")
                         // Surface the real reason on screen (detail) so failures are diagnosable instead
                         // of an opaque "something went wrong"; speak a short, friendly version.
                         val shown = if (detail.isNotEmpty()) "Sorry — $detail" else "Sorry, something went wrong — try again."
-                        overlay.answer(shown); voice.speak("Sorry, something went wrong.")
+                        overlay.answer(shown); voice.speak("Sorry, something went wrong.") { onSpeechFinished() }
                     }
                     else -> {}
                 }
