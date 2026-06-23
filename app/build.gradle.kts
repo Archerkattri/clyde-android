@@ -33,8 +33,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 35
-        versionName = "0.1.34"
+        versionCode = 36
+        versionName = "0.1.35"
         vectorDrawables { useSupportLibrary = true }
         // arm64-only by design (the embedded brain's libnode.so is arm64; the bootstrap is aarch64).
         // Keeps Vosk's native libs to arm64-v8a instead of bundling all four ABIs. The x86_64 UI-test
