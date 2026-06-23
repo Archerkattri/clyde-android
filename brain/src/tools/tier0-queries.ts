@@ -1,7 +1,7 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import type { ToolCtx } from "../context";
-import { json, err } from "./helpers";
+import { json, text, err } from "./helpers";
 
 /** Tier 0 — read-only device queries via the app's content providers (contacts, apps, calendar). */
 export function makeTier0Queries(ctx: ToolCtx) {
@@ -37,6 +37,16 @@ export function makeTier0Queries(ctx: ToolCtx) {
       "Read the user's current notifications (app, title, text), newest first. Use for 'what did I miss?'. Needs Notification access.",
       {},
       async () => q("read_notifications", {})
+    ),
+
+    tool(
+      "set_default_app",
+      "Remember the user's preferred app for a category so you use it automatically next time (e.g. category 'music' → a package). Call this once the user has picked/confirmed which app to use for that kind of task. Categories are free-form: music, video, maps, browser, mail, etc.",
+      { category: z.string(), package: z.string().describe("exact package, from list_apps") },
+      async (a) => {
+        const r = await ctx.app.setDefaultApp(a.category, a.package);
+        return r.ok ? text(`Got it — I'll use that for ${a.category} from now on.`) : err(r.error ?? "couldn't save the preference");
+      }
     ),
   ];
 }

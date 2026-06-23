@@ -16,6 +16,7 @@ const SAFE = new Set<string>([
   "play_media", "media_control", "compose_email", "web_search", "open_settings_panel",
   // read-only queries (any send/exfil tool they feed stays consequential + gated)
   "find_contact", "list_apps", "list_calendar_events", "read_notifications",
+  "set_default_app", // benign preference write the user directed
 ]);
 
 /** Stable hash of a tool's args (excludes the token) — binds an approval to one concrete call. */

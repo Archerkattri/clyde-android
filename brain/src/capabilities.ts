@@ -29,5 +29,6 @@ export async function probeCapabilities(app: AppClient): Promise<Capabilities> {
     root,
     overlay: Boolean(a.overlay),
     perms: a.perms ?? {},
+    defaultApps: a.defaultApps ?? {},
   };
 }

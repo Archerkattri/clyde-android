@@ -6,6 +6,7 @@ import dev.kris.clyde.intents.DeviceIntents
 import dev.kris.clyde.intents.DeviceQueries
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.PhoneControlAccessibilityService
+import dev.kris.clyde.util.Prefs
 import dev.kris.clyde.voice.VoiceIO
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoHTTPD.IHTTPSession
@@ -109,6 +110,17 @@ class LocalControlServer(
                         else -> DeviceQueries.query(ctx, name, body)?.let { ok(it) } ?: err("unknown query: $name")
                     }
                 }
+                uri == "/prefs/set_default_app" -> {
+                    val cat = body.optString("category")
+                    val pkg = body.optString("package")
+                    if (cat.isBlank()) err("category required")
+                    else {
+                        val obj = runCatching { JSONObject(Prefs.defaultApps) }.getOrDefault(JSONObject())
+                        if (pkg.isBlank()) obj.remove(cat) else obj.put(cat, pkg)
+                        Prefs.defaultApps = obj.toString()
+                        ok(JSONObject().put("category", cat).put("package", pkg))
+                    }
+                }
                 uri == "/speak" -> { voice.speak(body.optString("text")); ok(JSONObject()) }
                 uri == "/overlay/status" -> {
                     overlayStatus(body.optString("text"), body.optString("state").ifBlank { null }); ok(JSONObject())
@@ -161,6 +173,7 @@ class LocalControlServer(
             .put("root", c.root)
             .put("overlay", c.overlay)
             .put("perms", perms)
+            .put("defaultApps", runCatching { JSONObject(Prefs.defaultApps) }.getOrDefault(JSONObject()))
     }
 
     private fun a11y(block: (PhoneControlAccessibilityService) -> JSONObject): JSONObject {

@@ -68,6 +68,11 @@ export class AppClient {
     return this.req<unknown>("POST", `/query/${name}`, body);
   }
 
+  // ── preferences: remember the user's default app for a category ──
+  setDefaultApp(category: string, pkg: string) {
+    return this.req<unknown>("POST", "/prefs/set_default_app", { category, package: pkg });
+  }
+
   // ── voice / overlay / gemini / confirm ──
   speak(text: string) {
     return this.req("POST", "/speak", { text });

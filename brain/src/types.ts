@@ -11,6 +11,7 @@ export interface Capabilities {
   root: boolean;
   overlay: boolean;
   perms: Record<string, boolean>; // sms, call, location, calendar, mic, ...
+  defaultApps: Record<string, string>; // preferred app per category: {music, video, maps, browser, ...}
 }
 
 /** Raw shape the app's GET /caps returns. */
@@ -20,6 +21,7 @@ export interface AppCaps {
   root?: boolean;
   overlay?: boolean;
   perms?: Record<string, boolean>;
+  defaultApps?: Record<string, string>;
 }
 
 /** Standard envelope every LocalControlServer endpoint returns. */

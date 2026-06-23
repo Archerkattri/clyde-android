@@ -26,6 +26,7 @@ object Prefs {
     private const val KEY_SIGNED_IN = "signed_in"
     private const val KEY_OAUTH_ENC = "oauth_token_enc" // CLAUDE_CODE_OAUTH_TOKEN, encrypted at rest
     private const val KEY_MODEL = "assistant_model"
+    private const val KEY_DEFAULT_APPS = "default_apps" // JSON {category: package}
     private const val KS_ALIAS = "clyde_prefs_aeskey"
     private const val ANDROID_KS = "AndroidKeyStore"
 
@@ -58,6 +59,12 @@ object Prefs {
     var assistantModel: String
         get() = sp.getString(KEY_MODEL, "sonnet") ?: "sonnet"
         set(value) = sp.edit().putString(KEY_MODEL, value).apply()
+
+    /** Preferred app per category ({"music":"<pkg>","maps":…}) as raw JSON. Learned on first use —
+     *  the brain asks once, then remembers — and changeable by asking. Plain prefs, not a secret. */
+    var defaultApps: String
+        get() = sp.getString(KEY_DEFAULT_APPS, "{}") ?: "{}"
+        set(value) = sp.edit().putString(KEY_DEFAULT_APPS, value).apply()
 
     /** The subscription CLAUDE_CODE_OAUTH_TOKEN (from desktop `claude setup-token`), encrypted at rest
      *  under the same TEE Keystore key as the loopback secret. "" when not set. */
