@@ -77,5 +77,9 @@ app actions, hallucinated notification summaries (pulled), credibility damage fr
   diagnostics, code help) — capabilities Gemini/Siri structurally lack. System-prompt depth.
 - **Batch 3** (P0 #4 partial — "show your work") — shipped **v0.1.44**: a live step feed during multi-step
   tasks (prior steps done/green, current pulsing) — agentic transparency Gemini/Siri don't offer.
-- Next: streaming TTS (latency) + tiered approval/plan-preview + recurring scheduled actions — these need
-  on-device iteration (audio/behavior timing), so they come after the user validates v0.1.42–44.
+- **Batch 4** (P0 #4 — latency) — shipped **v0.1.45**: streaming TTS. Speaks the first sentence of a
+  multi-sentence answer the instant it's ready (rest queued after), hitting the natural-feel window.
+  Conservative: short answers unchanged; auto-listen rides the final chunk (fires once). **Needs
+  on-device audio confirmation** (TTS timing/queueing can't be tested on PC).
+- Next (need on-device iteration): tiered approval + plan-preview; recurring scheduled actions
+  (reschedule-on-fire has alarm-loop risk → test firing on a real phone); barge-in (needs AEC).

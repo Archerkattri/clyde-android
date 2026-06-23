@@ -304,13 +304,37 @@ class AgentOrchestratorService : Service() {
     private fun normalizeSpeech(s: String): String =
         s.lowercase().replace(Regex("[^a-z0-9 ]"), " ").replace(Regex("\\s+"), " ").trim()
 
+    /** First complete sentence in [buf] when there's clearly more text after it (so the spoken remainder
+     *  is non-empty) and it's long enough to be worth speaking early. Stops before any followups marker so
+     *  the trailer is never spoken aloud. Returns null to keep waiting. */
+    private fun firstSentenceWithMore(buf: String): String? {
+        val s = buf.substringBefore("[[")
+        val m = Regex("[.!?]\\s").find(s) ?: return null
+        val end = m.range.first + 1
+        if (end < 12) return null
+        if (s.substring(end).isBlank()) return null
+        return s.substring(0, end).trim()
+    }
+
     private fun handle(text: String) {
         overlay.status("Thinking…")
         scope.launch {
+            // Streaming TTS: accumulate the FINAL answer's text deltas (reset on each tool call so we
+            // never speak intermediate narration) and speak its first sentence early for low latency.
+            val sb = StringBuilder()
+            var earlySpoken = false
+            var earlyText = ""
             BrainClient.query(text, sessionId, Prefs.assistantModel) { ev ->
                 when (ev.optString("type")) {
                     "status" -> overlay.status(ev.optString("text"))
-                    "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
+                    "action" -> {
+                        overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
+                        sb.setLength(0); earlySpoken = false; earlyText = "" // the answer comes AFTER the last tool call
+                    }
+                    "delta" -> {
+                        sb.append(ev.optString("text"))
+                        if (!earlySpoken) firstSentenceWithMore(sb.toString())?.let { earlySpoken = true; earlyText = it; voice.speakEarly(it) }
+                    }
                     "need_confirm" -> overlay.status(ev.optString("summary").ifBlank { "Waiting for your OK…" })
                     "suggestions" -> {
                         val arr = ev.optJSONArray("items")
@@ -321,7 +345,19 @@ class AgentOrchestratorService : Service() {
                         }
                     }
                     // ignore a blank final (e.g. a turn that ended with no answer) — keep the last status
-                    "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) { onSpeechFinished() } }
+                    "final" -> {
+                        val clean = ev.optString("text").trim()
+                        if (clean.isNotEmpty()) {
+                            overlay.answer(clean)
+                            if (earlySpoken && clean.startsWith(earlyText)) {
+                                // first sentence already spoken → just speak the rest (queued after it)
+                                val remainder = clean.substring(earlyText.length).trim()
+                                if (remainder.isNotEmpty()) voice.speakRemainder(remainder) { onSpeechFinished() } else onSpeechFinished()
+                            } else {
+                                voice.speak(clean) { onSpeechFinished() } // short answer / not streamed → speak the whole thing
+                            }
+                        }
+                    }
                     "error" -> {
                         val detail = ev.optString("detail").trim()
                         Log.w(TAG, "brain error: ${ev.optString("text")} | detail=$detail")

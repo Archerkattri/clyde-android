@@ -26,6 +26,11 @@ class VoiceIO(private val ctx: Context) {
     // Fired once when the current utterance finishes naturally (not on stop) — drives "listen again
     // after Clyde speaks" so a conversation continues without re-summoning. Cleared on stop/interrupt.
     @Volatile private var speakDone: (() -> Unit)? = null
+    // Streaming TTS: an answer may be spoken as an early first sentence (QUEUE_FLUSH, no continuation)
+    // then its remainder (QUEUE_ADD). Only the utterance whose id equals this one runs speakDone, so
+    // auto-listen fires exactly once — after the WHOLE answer has been spoken, never after the early bit.
+    @Volatile private var finalUtteranceId: String? = null
+    private var utterSeq = 0
 
     // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
     // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
@@ -72,11 +77,13 @@ class VoiceIO(private val ctx: Context) {
             // Natural completion → run the one-shot continuation (auto-listen). stop()/interrupt clears
             // speakDone first, so an interrupted utterance never auto-listens.
             override fun onDone(utteranceId: String?) {
+                if (utteranceId == null || utteranceId != finalUtteranceId) return // early chunk → no continuation
+                finalUtteranceId = null
                 val d = speakDone; speakDone = null
                 if (d != null) main.post { d() }
             }
-            @Deprecated("kept for older engines") override fun onError(utteranceId: String?) { speakDone = null }
-            override fun onError(utteranceId: String?, errorCode: Int) { speakDone = null }
+            @Deprecated("kept for older engines") override fun onError(utteranceId: String?) { speakDone = null; finalUtteranceId = null }
+            override fun onError(utteranceId: String?, errorCode: Int) { speakDone = null; finalUtteranceId = null }
         })
     }
 
@@ -84,12 +91,32 @@ class VoiceIO(private val ctx: Context) {
      *  utteranceId must be non-null for the progress listener to fire onDone. */
     fun speak(text: String, onDone: () -> Unit = {}) = onMain {
         speakDone = onDone
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clyde-${System.identityHashCode(text)}-${text.length}")
+        val id = "final-${utterSeq++}"
+        finalUtteranceId = id
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+    }
+
+    /** Streaming TTS — speak the first sentence the instant it's ready (flushes prior speech). No
+     *  continuation rides this chunk; the remainder carries it, so auto-listen never fires early. */
+    fun speakEarly(text: String) = onMain {
+        if (text.isBlank()) return@onMain
+        finalUtteranceId = null
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "early-${utterSeq++}")
+    }
+
+    /** Streaming TTS — speak the rest of the answer QUEUED after the early sentence; [onDone]
+     *  (auto-listen) fires when THIS finishes, i.e. after the whole answer has been spoken. */
+    fun speakRemainder(text: String, onDone: () -> Unit = {}) = onMain {
+        if (text.isBlank()) { onDone(); return@onMain }
+        speakDone = onDone
+        val id = "final-${utterSeq++}"
+        finalUtteranceId = id
+        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
     }
 
     /** Interrupt any ongoing speech immediately (tapping mic / sending a new message / dismissing).
      *  Clears the pending continuation so an interrupted answer doesn't also auto-listen. */
-    fun stopSpeaking() = onMain { speakDone = null; tts?.stop() }
+    fun stopSpeaking() = onMain { speakDone = null; finalUtteranceId = null; tts?.stop() }
 
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit, onRms: (Float) -> Unit = {}) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
