@@ -15,8 +15,7 @@ process.on("unhandledRejection", (e) => console.error("[clyde] unhandledRejectio
 
 const MAX_BODY = 256 * 1024;
 const MAX_INFLIGHT = 1; // one supervised turn at a time (also prevents cross-turn halt races)
-const CLAUDE_MODELS = new Set(["opus", "sonnet", "haiku"]); // app-selectable Claude models
-const CODEX_MODELS = new Set(["gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"]); // app-selectable Codex models
+const ALLOWED_MODELS = new Set(["opus", "sonnet", "haiku"]); // app-selectable assistant models
 let inFlight = 0;
 
 function safeEqual(a: string, b: string): boolean {
@@ -123,7 +122,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       res.end(JSON.stringify({ ok: false, error: "request too large" }));
       return;
     }
-    let parsed: { text?: unknown; sessionId?: unknown; model?: unknown; backend?: unknown };
+    let parsed: { text?: unknown; sessionId?: unknown; model?: unknown };
     try {
       parsed = JSON.parse(raw || "{}");
     } catch {
@@ -133,11 +132,9 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     }
     const text = String(parsed.text ?? "").trim();
     const sessionId = String(parsed.sessionId ?? "default");
-    const backend: "claude" | "codex" = parsed.backend === "codex" ? "codex" : "claude";
-    // Allowlist the model PER BACKEND so a request can't smuggle an arbitrary string into the CLI.
-    const allowedModels = backend === "codex" ? CODEX_MODELS : CLAUDE_MODELS;
+    // Allowlist the model so a request can't smuggle an arbitrary string into the SDK option.
     const model =
-      typeof parsed.model === "string" && allowedModels.has(parsed.model) ? parsed.model : undefined;
+      typeof parsed.model === "string" && ALLOWED_MODELS.has(parsed.model) ? parsed.model : undefined;
     if (!text) {
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "missing text" }));
@@ -148,7 +145,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     const emit = (ev: AgentEvent) => res.write(JSON.stringify(ev) + "\n");
     inFlight++;
     try {
-      await runAgent({ text, sessionId, model, backend }, emit);
+      await runAgent({ text, sessionId, model }, emit);
     } catch (e) {
       console.error("[clyde] query error:", e);
       emit({ type: "error", text: "Something went wrong while handling that.", detail: String((e as Error)?.message ?? e).slice(0, 240) });

@@ -10,7 +10,6 @@ import { buildClydeServer, CLYDE_SERVER_NAME } from "./tools/index";
 import { rish, su } from "./shell";
 import type { ToolCtx } from "./context";
 import type { Emit } from "./types";
-import { runCodex, haltCodex } from "./codex";
 
 const SYSTEM_PROMPT = readFileSync(resolve(process.cwd(), "system-prompt.md"), "utf8");
 
@@ -51,24 +50,15 @@ export function haltActiveTurn(): void {
   haltCurrent?.();
   // interrupt() may reject if the control transport is closed (string-prompt turns) — swallow it.
   activeQuery?.interrupt()?.catch(() => {});
-  haltCodex(); // also stop an in-flight Codex turn
 }
 
 export interface RunArgs {
   text: string;
   sessionId: string;
-  model?: string; // per-query model override; falls back to config.model / config.codexModel
-  backend?: "claude" | "codex"; // which brain serves this turn; else config.backend
+  model?: string; // per-query model override (opus|sonnet|haiku); falls back to config.model
 }
 
-/** Dispatch a turn to the selected brain backend (Claude Agent SDK or OpenAI Codex). */
 export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
-  const backend = args.backend ?? config.backend;
-  if (backend === "codex") return runCodex(args, emit);
-  return runClaude(args, emit);
-}
-
-async function runClaude(args: RunArgs, emit: Emit): Promise<void> {
   emit({ type: "status", text: "thinking…" });
 
   const caps = await probeCapabilities(app);

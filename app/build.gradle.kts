@@ -33,12 +33,11 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.1.35"
+        versionCode = 37
+        versionName = "0.1.36"
         vectorDrawables { useSupportLibrary = true }
         // arm64-only by design (the embedded brain's libnode.so is arm64; the bootstrap is aarch64).
-        // Keeps Vosk's native libs to arm64-v8a instead of bundling all four ABIs. The x86_64 UI-test
-        // emulator runs arm64 via translation, so this doesn't affect that path.
+        // The x86_64 UI-test emulator runs arm64 via translation, so this doesn't affect that path.
         ndk { abiFilters += "arm64-v8a" }
     }
 
@@ -125,10 +124,6 @@ dependencies {
 
     // Embedded loopback HTTP server (LocalControlServer on 127.0.0.1:8766)
     implementation("org.nanohttpd:nanohttpd:2.3.1")
-
-    // "Hey Clyde" on-device wake word — Vosk (Apache-2.0). Bundles arm64 JNI; the small en model is
-    // downloaded on first enable (keeps the APK lean). Off by default.
-    implementation("com.alphacephei:vosk-android:0.3.47")
 
     // Shizuku (Tier 2 — ADB-level control, no root)
     implementation("dev.rikka.shizuku:api:13.1.5")

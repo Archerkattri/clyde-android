@@ -12,9 +12,6 @@ class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             Reminders.rescheduleAll(ctx) // alarms don't survive reboot → re-arm them
-            // Best-effort re-arm of the hotword; a mic FGS may be blocked from boot on 12+ (then the
-            // user re-arms it by opening Clyde once) — startIfEnabled swallows that.
-            dev.kris.clyde.wake.WakeWordService.startIfEnabled(ctx)
             return
         }
         val id = intent.getStringExtra(Reminders.EXTRA_ID) ?: return
