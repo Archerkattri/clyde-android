@@ -70,4 +70,10 @@ app actions, hallucinated notification summaries (pulled), credibility damage fr
 14. **Confidence-signaled actions / deny-and-continue** safety polish.
 
 ## Status
-- Batch 1 (P0 #1–3): in progress.
+- **Batch 1** (P0 #1–3) — shipped **v0.1.42**: honest/terse "answer-don't-deflect" answering, follow-up
+  suggestion chips, live mic-amplitude voice light.
+- **Batch 2** (P1 #6, #9) — shipped **v0.1.43**: general screen-awareness ("what's on my screen" /
+  summarize / reply-to-this in any app) + on-device technical help (read logs, explain errors, run
+  diagnostics, code help) — capabilities Gemini/Siri structurally lack. System-prompt depth.
+- Next: streaming TTS (latency) + tiered approval/plan-preview + recurring scheduled actions — to be done
+  in batches the user can test on-device between (audio/behavior timing needs a real phone).
