@@ -186,6 +186,7 @@ class AgentOrchestratorService : Service() {
         if (fresh) listenRetries = 0
         voice.listen(
             onPartial = { overlay.transcript(it) },
+            onRms = { overlay.amplitude(it) },
             onFinal = { text -> listenRetries = 0; if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
             onError = { err ->
                 val fatal = err == "mic-permission" || err == "speech recognition unavailable"
@@ -232,6 +233,7 @@ class AgentOrchestratorService : Service() {
         if (!overlay.isAsking()) return
         voice.listen(
             onPartial = { partial -> if (overlay.isAsking()) overlay.updateAskTranscript(partial, matchOption(partial, options)) },
+            onRms = { if (overlay.isAsking()) overlay.amplitude(it) },
             onFinal = { said ->
                 if (overlay.isAsking()) {
                     val idx = matchOption(said, options)
@@ -310,6 +312,14 @@ class AgentOrchestratorService : Service() {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
                     "need_confirm" -> overlay.status(ev.optString("summary").ifBlank { "Waiting for your OK…" })
+                    "suggestions" -> {
+                        val arr = ev.optJSONArray("items")
+                        if (arr != null) {
+                            val items = ArrayList<String>()
+                            for (i in 0 until arr.length()) arr.optString(i).takeIf { it.isNotBlank() }?.let { items.add(it) }
+                            overlay.suggestions(items)
+                        }
+                    }
                     // ignore a blank final (e.g. a turn that ended with no answer) — keep the last status
                     "final" -> ev.optString("text").trim().takeIf { it.isNotEmpty() }?.let { overlay.answer(it); voice.speak(it) { onSpeechFinished() } }
                     "error" -> {

@@ -32,6 +32,19 @@ export function pickModel(text: string, ceiling: string): string {
   return RANK_MODEL[rank];
 }
 
+/** Pull an optional `[[followups]] a | b | c` trailer the model may append to its final reply. Returns
+ *  the answer with that line removed (so it's never spoken) plus up to 3 follow-up suggestions. */
+export function extractFollowups(text: string): { clean: string; followups: string[] } {
+  let followups: string[] = [];
+  const kept: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/\[\[followups\]\]\s*(.*)$/i);
+    if (m) followups = m[1].split("|").map((s) => s.trim()).filter(Boolean).slice(0, 3);
+    else kept.push(line);
+  }
+  return { clean: kept.join("\n").trim(), followups };
+}
+
 // Long-lived singletons shared across queries.
 const app = new AppClient();
 const safety = new Safety();
@@ -191,7 +204,10 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
     const final = res.finalText.trim() ||
       (res.resultSubtype.includes("max_turns") ? "That got complicated — I stopped before finishing. Try a smaller step." :
         res.resultSubtype.startsWith("error") ? "Something went wrong while handling that." : "Done.");
-    emit({ type: "final", text: final });
+    // Split off any "[[followups]] …" trailer so it's never spoken; surface it as tappable chips.
+    const { clean, followups } = extractFollowups(final);
+    emit({ type: "final", text: clean });
+    if (followups.length) emit({ type: "suggestions", items: followups });
   } catch (e) {
     console.error("[clyde] agent error:", e); // full detail to logs
     emit({ type: "error", text: "Something went wrong while handling that.", detail: String((e as Error)?.message ?? e).slice(0, 240) });

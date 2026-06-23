@@ -59,6 +59,7 @@ export type AgentEvent =
   | { type: "delta"; text: string } // token-by-token assistant text (optional, for streaming TTS)
   | { type: "action"; tool: string; summary: string }
   | { type: "need_confirm"; summary: string; details?: string }
+  | { type: "suggestions"; items: string[] } // tappable follow-up chips shown with the answer
   | { type: "final"; text: string }
   | { type: "error"; text: string; detail?: string }; // detail = short real reason, for diagnostics
 

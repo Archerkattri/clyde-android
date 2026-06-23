@@ -91,7 +91,7 @@ class VoiceIO(private val ctx: Context) {
      *  Clears the pending continuation so an interrupted answer doesn't also auto-listen. */
     fun stopSpeaking() = onMain { speakDone = null; tts?.stop() }
 
-    fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit) = onMain {
+    fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit, onRms: (Float) -> Unit = {}) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             onError("speech recognition unavailable")
             return@onMain
@@ -102,7 +102,11 @@ class VoiceIO(private val ctx: Context) {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
                 override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
+                // Mic level for the live voice light. rmsdB runs roughly -2 (silence) .. 10 (loud);
+                // normalize to 0..1 so the UI reacts to the user's actual voice, not a canned animation.
+                override fun onRmsChanged(rmsdB: Float) {
+                    if (sessionActive) onRms(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onError(error: Int) {

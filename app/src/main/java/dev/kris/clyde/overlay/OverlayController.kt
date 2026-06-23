@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -109,6 +110,9 @@ data class OverlayUi(
     val askOptions: List<String> = emptyList(),
     val askTranscript: String = "", // live partial speech while choosing
     val askHighlight: Int = -1, // option the current speech matches (live feedback), -1 = none
+
+    val suggestions: List<String> = emptyList(), // tappable follow-up chips shown under an answer
+    val amplitude: Float = 0f, // live mic level 0..1 while listening (drives the voice light)
 )
 
 /** The user's answer to an ask_user question — by voice (verbatim words in [text]) or by tapping. */
@@ -215,14 +219,14 @@ class OverlayController(private val appCtx: Context) :
         syncWindowMode()
     }
 
-    fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text) }
+    fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text, suggestions = emptyList()) }
     fun status(text: String) = onMain {
         if (dismissed) return@onMain
         if (ui.value.mode == OverlayMode.Confirm || ui.value.mode == OverlayMode.Ask) return@onMain // don't clobber an active modal
         main.removeCallbacks(settle)
         // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
         val sc = overlayScene(text)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, clawd = ClawdState.Working)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), clawd = ClawdState.Working)
         attach()
         syncWindowMode()
     }
@@ -233,6 +237,18 @@ class OverlayController(private val appCtx: Context) :
         attach()
         syncWindowMode()
         main.postDelayed(settle, 2200)
+    }
+
+    /** Show tappable follow-up chips under the current answer (from the brain's `suggestions` event). */
+    fun suggestions(items: List<String>) = onMain {
+        if (dismissed || ui.value.mode != OverlayMode.Summon) return@onMain // only alongside an answer
+        ui.value = ui.value.copy(suggestions = items.take(3))
+    }
+
+    /** Live mic level (0..1) while listening — drives the voice light's reactive glow. */
+    fun amplitude(level: Float) = onMain {
+        if (ui.value.clawd != ClawdState.Listening) return@onMain
+        ui.value = ui.value.copy(amplitude = level)
     }
 
     /** True while the popup is on screen (not dismissed) — guards auto-listen after a spoken answer. */
@@ -455,6 +471,7 @@ class OverlayController(private val appCtx: Context) :
                     onSend = { onSend(it) },
                     onAskPick = { pickAsk(it) },
                     onAskCancel = { cancelAsk() },
+                    onSuggestion = { onSend(it) }, // a tapped follow-up chip is just a pre-filled message
                 )
             }
         }
@@ -589,7 +606,7 @@ class OverlayController(private val appCtx: Context) :
 // ─────────────────────────── overlay UI ───────────────────────────
 
 @Composable
-private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit, onMic: () -> Unit, onSend: (String) -> Unit, onAskPick: (Int) -> Unit, onAskCancel: () -> Unit) {
+private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit, onClose: () -> Unit, onMic: () -> Unit, onSend: (String) -> Unit, onAskPick: (Int) -> Unit, onAskCancel: () -> Unit, onSuggestion: (String) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         // tap-outside: dismiss (summon) / deny (confirm) / cancel (ask)
         Box(
@@ -605,7 +622,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
             }
         )
         when (ui.mode) {
-            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend)
+            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend, onSuggestion)
             OverlayMode.Confirm -> ConfirmPanel(ui, onApprove, onDeny)
             OverlayMode.Ask -> AskPanel(ui, onAskPick)
             OverlayMode.Hidden -> {}
@@ -614,7 +631,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit, onSuggestion: (String) -> Unit) {
     var shown by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { shown = true }
@@ -656,13 +673,28 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
                 ui.transcript.isNotBlank() -> Text(ui.transcript, fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = ClydeColor.Ink)
                 else -> {} // the ActivityLine above carries the live status now
             }
+            // Follow-up suggestion chips under an answer — tap to ask the next thing (rich-response parity).
+            if (ui.answer.isNotBlank() && ui.suggestions.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ui.suggestions.forEach { s ->
+                        Box(
+                            Modifier
+                                .background(ClydeColor.Panel2, RoundedCornerShape(999.dp))
+                                .border(1.dp, ClydeColor.Blue, RoundedCornerShape(999.dp))
+                                .pressable(label = s) { onSuggestion(s) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        ) { Text(s, fontFamily = Body, fontSize = 13.sp, color = ClydeColor.Blue, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Row(
                 Modifier.fillMaxWidth().background(ClydeColor.Panel2, RoundedCornerShape(999.dp))
                     .border(1.dp, ClydeColor.Blue, RoundedCornerShape(999.dp)).padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                VoiceLight()
+                VoiceLight(if (ui.clawd == ClawdState.Listening) ui.amplitude else 0f)
                 Spacer(Modifier.size(10.dp))
                 // Type a message OR tap the mic. The button is Send when there's text, else the mic
                 // (which stops any speech and listens again — so it never just closes the popup).
@@ -851,7 +883,7 @@ private fun androidx.compose.foundation.layout.BoxScope.AskPanel(ui: OverlayUi, 
             Spacer(Modifier.height(2.dp))
             // Listening indicator + live transcript so the user sees they can talk (and what's heard).
             Row(verticalAlignment = Alignment.CenterVertically) {
-                VoiceLight()
+                VoiceLight(ui.amplitude)
                 Spacer(Modifier.size(10.dp))
                 val heard = ui.askTranscript.isNotBlank()
                 Text(
@@ -902,18 +934,21 @@ private fun PulseDot(color: Color, active: Boolean) {
 
 /** Voice-as-light: a blue pool that breathes (amplitude stand-in), not a literal waveform. */
 @Composable
-private fun VoiceLight() {
+private fun VoiceLight(amplitude: Float = 0f) {
     if (reduceMotion()) {
         Box(Modifier.width(40.dp).height(16.dp).background(ClydeColor.Blue, RoundedCornerShape(999.dp)))
         return
     }
     val t = rememberInfiniteTransition(label = "voice")
-    val a by t.animateFloat(
+    // Idle breathe keeps it alive; the real mic level takes over and dominates when the user is speaking.
+    val idle by t.animateFloat(
         initialValue = 0.45f,
-        targetValue = 1f,
+        targetValue = 0.72f,
         animationSpec = infiniteRepeatable(tween(820), RepeatMode.Reverse),
-        label = "voiceA",
+        label = "voiceIdle",
     )
+    val live by animateFloatAsState(amplitude.coerceIn(0f, 1f), tween(120), label = "voiceAmp")
+    val a = maxOf(idle, 0.45f + 0.55f * live)
     Box(
         Modifier
             .width(40.dp)
