@@ -1,9 +1,13 @@
 package dev.kris.clyde.intents
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaMetadata
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.Settings
@@ -34,13 +38,13 @@ object DeviceQueries {
 
     /** Special access (not a runtime permission) a query needs but doesn't have — null if granted. */
     fun missingAccessFor(name: String): String? = when (name) {
-        "read_notifications" -> if (ClydeNotificationListener.instance != null) null else "Notification access"
+        "read_notifications", "now_playing" -> if (ClydeNotificationListener.instance != null) null else "Notification access"
         else -> null
     }
 
     /** Open the settings screen where the user grants the special access a query needs. */
     fun openAccessSettings(ctx: Context, name: String) {
-        if (name == "read_notifications") runCatching {
+        if (name == "read_notifications" || name == "now_playing") runCatching {
             ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
@@ -51,7 +55,30 @@ object DeviceQueries {
         "list_apps" -> listApps(ctx, body.optString("filter"))
         "list_calendar_events" -> listCalendarEvents(ctx, body.optInt("days", 7).coerceIn(1, 60))
         "read_notifications" -> JSONObject().put("notifications", ClydeNotificationListener.snapshot() ?: JSONArray())
+        "now_playing" -> nowPlaying(ctx)
         else -> null
+    }
+
+    /** Current media playback (title/artist/album/app) via active MediaSessions — needs Notification
+     *  access (the listener component authorizes getActiveSessions). */
+    private fun nowPlaying(ctx: Context): JSONObject {
+        val out = JSONObject().put("playing", false)
+        runCatching {
+            val msm = ctx.getSystemService(MediaSessionManager::class.java) ?: return@runCatching
+            val comp = ComponentName(ctx, ClydeNotificationListener::class.java)
+            val sessions = msm.getActiveSessions(comp)
+            val active = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: sessions.firstOrNull()
+            if (active != null) {
+                out.put("app", active.packageName)
+                out.put("playing", active.playbackState?.state == PlaybackState.STATE_PLAYING)
+                active.metadata?.let { md ->
+                    out.put("title", md.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "")
+                    out.put("artist", md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "")
+                    out.put("album", md.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: "")
+                }
+            }
+        }
+        return out
     }
 
     private fun findContact(ctx: Context, name: String): JSONObject {

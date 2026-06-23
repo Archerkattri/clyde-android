@@ -40,6 +40,13 @@ export function makeTier0Queries(ctx: ToolCtx) {
     ),
 
     tool(
+      "now_playing",
+      "What media is currently playing — title, artist, album, and app. Use to know or act on the current song/video/podcast. Needs Notification access.",
+      {},
+      async () => q("now_playing", {})
+    ),
+
+    tool(
       "set_default_app",
       "Remember the user's preferred app for a category so you use it automatically next time (e.g. category 'music' → a package). Call this once the user has picked/confirmed which app to use for that kind of task. Categories are free-form: music, video, maps, browser, mail, etc.",
       { category: z.string(), package: z.string().describe("exact package, from list_apps") },
