@@ -392,6 +392,11 @@ class OverlayController(private val appCtx: Context) :
             flags,
             PixelFormat.TRANSLUCENT,
         )
+        // Extend the window THROUGH the camera cutout/notch so it reports the real cutout insets — this
+        // is what lets Clawd free-fall from the actual front camera (else the cutout is null and the drop
+        // starts from a generic top-center point below the status bar, i.e. "not from the camera").
+        params.layoutInDisplayCutoutMode =
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         if (!passthrough) {
             // Focusable so the typed-message field can raise the keyboard; ADJUST_RESIZE lifts the panel
             // above it. Voice stays first — the keyboard only appears if the user taps the text field.

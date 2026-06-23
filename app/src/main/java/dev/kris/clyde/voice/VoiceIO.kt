@@ -112,6 +112,7 @@ class VoiceIO(private val ctx: Context) {
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "mic-permission"
                         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
                         SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "busy" // a prior session not yet released
                         else -> "stt-$error"
                     })
                 }
@@ -130,7 +131,15 @@ class VoiceIO(private val ctx: Context) {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, ctx.packageName)
+            // Be patient: don't end the turn the instant the user pauses, and require a little speech
+            // before giving up — far fewer spurious "didn't catch that". (OEMs honor these to varying
+            // degrees, but they never hurt.) NO EXTRA_PREFER_OFFLINE: forcing offline fails outright
+            // when the locale's offline model isn't installed — a big source of instant no-match.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500)
         }
         recognizer?.startListening(intent)
     }

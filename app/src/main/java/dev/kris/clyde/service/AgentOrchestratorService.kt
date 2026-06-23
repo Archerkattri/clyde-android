@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Session owner: hosts LocalControlServer (8766), runs voice, talks to the brain. */
@@ -44,6 +45,7 @@ class AgentOrchestratorService : Service() {
     private var server: LocalControlServer? = null
     private val brain by lazy { BrainRunner(applicationContext) }
     private val sessionId = "app-${System.currentTimeMillis()}"
+    private var listenRetries = 0 // transient STT errors retry quietly a couple of times before nagging
 
     override fun onCreate() {
         super.onCreate()
@@ -144,20 +146,32 @@ class AgentOrchestratorService : Service() {
         startListening()
     }
 
-    /** Start (or restart) a voice-listen cycle. Reused by the assist trigger and the mic button. */
-    private fun startListening() {
+    /** Start (or restart) a voice-listen cycle. Reused by the assist trigger and the mic button.
+     *  [fresh] true resets the retry counter (a user-initiated listen); the quiet auto-retry passes false. */
+    private fun startListening(fresh: Boolean = true) {
+        if (fresh) listenRetries = 0
         voice.listen(
             onPartial = { overlay.transcript(it) },
-            onFinal = { text -> if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
+            onFinal = { text -> listenRetries = 0; if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
             onError = { err ->
-                // Don't nag on a silent timeout — just go quiet; the mic button restarts listening.
-                if (err != "no-speech") overlay.status(when (err) {
-                    "mic-permission" -> "Mic access is off — enable it for Clyde in Settings"
-                    "network" -> "No connection for speech recognition"
-                    "speech recognition unavailable" -> "Speech isn't available on this device"
-                    else -> "Didn't catch that — tap the mic to try again"
-                })
-                Log.w(TAG, "Speech recognition error: $err")
+                val fatal = err == "mic-permission" || err == "speech recognition unavailable"
+                if (!fatal && listenRetries < 2 && overlay.isShowing()) {
+                    // Transient STT hiccups (busy / no-speech / network / stt-*) are common; retry quietly
+                    // a couple of times before EVER nagging, so one miss doesn't read as "didn't catch that".
+                    listenRetries++
+                    Log.w(TAG, "STT retry $listenRetries after: $err")
+                    scope.launch { delay(300); if (overlay.isShowing()) startListening(fresh = false) }
+                } else {
+                    listenRetries = 0
+                    when (err) {
+                        "mic-permission" -> overlay.status("Mic access is off — enable it for Clyde in Settings")
+                        "speech recognition unavailable" -> overlay.status("Speech isn't available on this device")
+                        "network" -> overlay.status("No connection for speech recognition")
+                        "no-speech" -> {} // heard nothing even after retries → just go quiet, no nag
+                        else -> overlay.status("Didn't catch that — tap the mic to try again")
+                    }
+                    Log.w(TAG, "Speech recognition error (final): $err")
+                }
             },
         )
     }
