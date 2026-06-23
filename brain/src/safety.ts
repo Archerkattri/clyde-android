@@ -14,9 +14,12 @@ const SAFE = new Set<string>([
   // deterministic, low-risk intents
   "launch_app", "set_alarm", "set_timer", "navigate_to",
   "play_media", "media_control", "compose_email", "web_search", "open_settings_panel",
+  "now_playing",
   // read-only queries (any send/exfil tool they feed stays consequential + gated)
   "find_contact", "list_apps", "list_calendar_events", "read_notifications",
   "set_default_app", // benign preference write the user directed
+  // reminders: scheduling a local alarm is harmless + reversible (cancel_reminder)
+  "set_reminder", "list_reminders", "cancel_reminder",
 ]);
 
 /** Stable hash of a tool's args (excludes the token) — binds an approval to one concrete call. */

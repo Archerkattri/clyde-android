@@ -4,6 +4,7 @@ import { makeMetaTools } from "./meta";
 import { makeTier0Intents } from "./tier0-intents";
 import { makeTier0Termux } from "./tier0-termuxapi";
 import { makeTier0Queries } from "./tier0-queries";
+import { makeTier0Reminders } from "./tier0-reminders";
 import { makeTier1Accessibility } from "./tier1-accessibility";
 import { makeTier2Shizuku } from "./tier2-shizuku";
 import { makeTier3Root } from "./tier3-root";
@@ -18,6 +19,7 @@ export function buildClydeTools(ctx: ToolCtx): SdkMcpToolDefinition<any>[] {
     ...makeTier0Intents(ctx),
     ...makeTier0Termux(ctx),
     ...makeTier0Queries(ctx),
+    ...makeTier0Reminders(ctx),
     ...makeGeminiTools(ctx),
   ];
   if (ctx.caps.tier1) tools.push(...makeTier1Accessibility(ctx));

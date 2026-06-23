@@ -13,6 +13,25 @@ import type { Emit } from "./types";
 
 const SYSTEM_PROMPT = readFileSync(resolve(process.cwd(), "system-prompt.md"), "utf8");
 
+const MODEL_RANK: Record<string, number> = { haiku: 0, sonnet: 1, opus: 2 };
+const RANK_MODEL = ["haiku", "sonnet", "opus"] as const;
+
+/** Smart model routing. The user's chosen model is the CEILING (used for anything that might drive an
+ *  app's UI or needs real reasoning). Only clearly-trivial turns — quick facts and clean one-shot API
+ *  actions that never touch a third-party screen — are downgraded to Haiku to save the user's usage
+ *  limits. Deliberately conservative: a short command like "play <song>" often means hard multi-step
+ *  automation, so when in doubt we keep the ceiling rather than risk a weaker model on real work. */
+export function pickModel(text: string, ceiling: string): string {
+  const cap = MODEL_RANK[ceiling] ?? MODEL_RANK.sonnet;
+  const t = text.toLowerCase().trim();
+  const words = t.split(/\s+/).filter(Boolean).length;
+  const trivial =
+    words <= 12 &&
+    /^(what('?s| is)?( the)? (time|date|day|battery|weather)|what time|what day|how much battery|set (a |an )?(timer|alarm)\b|remind me\b|cancel (my |the )?reminder|list (my )?reminders|what('?s| is) playing|flashlight|torch|turn (the )?(flashlight|torch)|define |how do you spell |convert |calculate |what('?s| is) \d|how many )/.test(t);
+  const rank = trivial ? Math.min(MODEL_RANK.haiku, cap) : cap;
+  return RANK_MODEL[rank];
+}
+
 // Long-lived singletons shared across queries.
 const app = new AppClient();
 const safety = new Safety();
@@ -51,6 +70,18 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
   let halted = false;
   haltCurrent = () => { halted = true; };
 
+  // The agent has no inherent clock; give it the device's current local time so it can resolve
+  // "5pm" / "tonight" / "in 2 hours" / "tomorrow 9am" into absolute times (reminders especially).
+  const now = new Date();
+  const systemPrompt =
+    SYSTEM_PROMPT +
+    `\n\n# Current time\nIt is now ${now.toString()} (epoch ms ${now.getTime()}). Use this for ALL time math.`;
+
+  // Smart routing: keep the user's model as the ceiling for real work; downgrade only trivial turns.
+  const ceiling = args.model ?? config.model ?? "sonnet";
+  const effectiveModel = pickModel(args.text, ceiling);
+  if (effectiveModel !== ceiling) console.error(`[clyde] routing this turn to ${effectiveModel} (ceiling ${ceiling})`);
+
   // One query attempt. `resumeId` continues a prior conversation; undefined starts fresh.
   const runOnce = async (resumeId: string | undefined): Promise<{ finalText: string; resultSubtype: string }> => {
     let finalText = "";
@@ -58,8 +89,8 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
     const q = query({
       prompt: args.text,
       options: {
-        systemPrompt: SYSTEM_PROMPT,
-        model: args.model ?? config.model, // app's per-turn pick wins; else the brain default
+        systemPrompt,
+        model: effectiveModel, // user's model is the ceiling; trivial turns auto-routed cheaper
 
         mcpServers: { [CLYDE_SERVER_NAME]: server },
         // The bundled CLI denies in-process MCP tools by default (it never routes them through our

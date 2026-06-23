@@ -4,6 +4,7 @@ import android.content.Context
 import dev.kris.clyde.caps.CapabilityProbe
 import dev.kris.clyde.intents.DeviceIntents
 import dev.kris.clyde.intents.DeviceQueries
+import dev.kris.clyde.reminders.Reminders
 import dev.kris.clyde.router.GeminiRouter
 import dev.kris.clyde.service.PhoneControlAccessibilityService
 import dev.kris.clyde.util.Prefs
@@ -109,6 +110,18 @@ class LocalControlServer(
                         needAccess != null -> { DeviceQueries.openAccessSettings(ctx, name); err("$name needs $needAccess — I opened the screen to enable it; turn it on, then retry") }
                         else -> DeviceQueries.query(ctx, name, body)?.let { ok(it) } ?: err("unknown query: $name")
                     }
+                }
+                uri == "/reminder/set" -> {
+                    val text = body.optString("text")
+                    val fireAt = body.optLong("fireAt", 0L)
+                    val action = body.optString("action").ifBlank { null }
+                    if (text.isBlank() || fireAt <= 0L) err("text and a future fireAt are required")
+                    else ok(Reminders.set(ctx, text, fireAt, action))
+                }
+                uri == "/reminder/list" -> ok(Reminders.list(ctx))
+                uri == "/reminder/cancel" -> {
+                    val id = body.optString("id")
+                    if (id.isBlank()) err("id required") else ok(JSONObject().put("cancelled", Reminders.cancel(ctx, id)))
                 }
                 uri == "/prefs/set_default_app" -> {
                     val cat = body.optString("category")

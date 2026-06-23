@@ -26,6 +26,11 @@ class VoiceIO(private val ctx: Context) {
     // Fired once when the current utterance finishes naturally (not on stop) — drives "listen again
     // after Clyde speaks" so a conversation continues without re-summoning. Cleared on stop/interrupt.
     @Volatile private var speakDone: (() -> Unit)? = null
+    // Speculative early-finish: when a partial result holds steady the user has clearly stopped, so we
+    // commit it without waiting out the full silence window. Conservative (a ~1.3s hold) so it doesn't
+    // cut off normal mid-sentence pauses — and consequential actions still confirm regardless.
+    @Volatile private var lastPartial = ""
+    private var earlyCommit: Runnable? = null
 
     // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
     // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
@@ -98,6 +103,8 @@ class VoiceIO(private val ctx: Context) {
         }
         recognizer?.destroy()
         sessionActive = true
+        lastPartial = ""
+        earlyCommit?.let { main.removeCallbacks(it) }; earlyCommit = null
         recognizer = SpeechRecognizer.createSpeechRecognizer(ctx).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
@@ -108,6 +115,7 @@ class VoiceIO(private val ctx: Context) {
                 override fun onError(error: Int) {
                     if (!sessionActive) return // a cancel WE initiated — don't fire (would re-show the overlay)
                     sessionActive = false
+                    earlyCommit?.let { main.removeCallbacks(it) }
                     onError(when (error) {
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "mic-permission"
                         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
@@ -118,11 +126,27 @@ class VoiceIO(private val ctx: Context) {
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
                     if (!sessionActive) return
-                    partialResults?.firstText()?.let(onPartial)
+                    val txt = partialResults?.firstText() ?: return
+                    onPartial(txt)
+                    if (txt.isBlank() || txt == lastPartial) return
+                    lastPartial = txt
+                    earlyCommit?.let { main.removeCallbacks(it) }
+                    // If this partial is still the latest after a clear pause AND it's a complete-enough
+                    // phrase (≥3 words), commit it as final now instead of waiting out the silence window.
+                    val r = Runnable {
+                        if (sessionActive && txt == lastPartial && txt.trim().split(Regex("\\s+")).size >= 3) {
+                            sessionActive = false
+                            recognizer?.cancel()
+                            onFinal(txt)
+                        }
+                    }
+                    earlyCommit = r
+                    main.postDelayed(r, 1300)
                 }
                 override fun onResults(results: Bundle?) {
                     if (!sessionActive) return
                     sessionActive = false
+                    earlyCommit?.let { main.removeCallbacks(it) }
                     results?.firstText()?.let(onFinal) ?: onError("no-speech")
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -151,6 +175,7 @@ class VoiceIO(private val ctx: Context) {
      *  a late cancellation callback can't re-attach the overlay (the "popup won't close" bug). */
     fun stopListening() = onMain {
         sessionActive = false
+        earlyCommit?.let { main.removeCallbacks(it) }
         recognizer?.cancel()
     }
 

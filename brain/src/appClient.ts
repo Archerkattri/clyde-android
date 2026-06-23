@@ -73,6 +73,17 @@ export class AppClient {
     return this.req<unknown>("POST", "/prefs/set_default_app", { category, package: pkg });
   }
 
+  // ── reminders (time-based; the app schedules an AlarmManager alarm) ──
+  reminderSet(b: { text: string; fireAt: number; action?: string }) {
+    return this.req<unknown>("POST", "/reminder/set", b);
+  }
+  reminderList() {
+    return this.req<unknown>("POST", "/reminder/list", {});
+  }
+  reminderCancel(id: string) {
+    return this.req<unknown>("POST", "/reminder/cancel", { id });
+  }
+
   // ── voice / overlay / gemini / confirm ──
   speak(text: string) {
     return this.req("POST", "/speak", { text });

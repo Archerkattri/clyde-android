@@ -33,6 +33,7 @@ class AgentOrchestratorService : Service() {
         const val ACTION_ASSIST = "dev.kris.clyde.ASSIST"
         const val ACTION_KILL = "dev.kris.clyde.KILL"
         const val ACTION_RESTART_BRAIN = "dev.kris.clyde.RESTART_BRAIN"
+        const val ACTION_REMINDER_FIRED = "dev.kris.clyde.REMINDER_FIRED"
         private const val CHANNEL = "clyde_orchestrator"
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
@@ -130,6 +131,17 @@ class AgentOrchestratorService : Service() {
             // Token just pasted / fresh login → bounce the brain so it relaunches WITH creds loaded.
             // Off the main thread: stop() now blocks until the old process dies (frees port 8765).
             ACTION_RESTART_BRAIN -> scope.launch(Dispatchers.IO) { brain.stop(); maybeStartEmbeddedBrain() }
+            ACTION_REMINDER_FIRED -> {
+                val text = intent.getStringExtra("text").orEmpty()
+                val action = intent.getStringExtra("action").orEmpty()
+                voice.stopSpeaking()
+                overlay.showSummon()
+                overlay.answer("Reminder: $text")
+                voice.speak("Reminder. $text")
+                // If the reminder carried an action ("at 6pm, start my commute playlist"), run it now —
+                // consequential steps still surface a confirm as usual.
+                if (action.isNotBlank()) handle(action)
+            }
         }
         return START_STICKY
     }
