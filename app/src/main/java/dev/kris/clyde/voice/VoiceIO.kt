@@ -18,6 +18,10 @@ class VoiceIO(private val ctx: Context) {
 
     private var tts: TextToSpeech? = null
     private var recognizer: SpeechRecognizer? = null
+    // True only while a listen cycle the user actually started is in flight. A stop/cancel WE trigger
+    // (dismiss / send / kill) clears it so the recognizer's late callbacks are ignored — otherwise a
+    // cancellation error re-ran onError → re-attached the overlay ("popup won't close").
+    @Volatile private var sessionActive = false
 
     // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
     // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
@@ -74,6 +78,7 @@ class VoiceIO(private val ctx: Context) {
             return@onMain
         }
         recognizer?.destroy()
+        sessionActive = true
         recognizer = SpeechRecognizer.createSpeechRecognizer(ctx).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
@@ -81,17 +86,24 @@ class VoiceIO(private val ctx: Context) {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
-                override fun onError(error: Int) = onError(when (error) {
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "mic-permission"
-                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
-                    SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network"
-                    else -> "stt-$error"
-                })
+                override fun onError(error: Int) {
+                    if (!sessionActive) return // a cancel WE initiated — don't fire (would re-show the overlay)
+                    sessionActive = false
+                    onError(when (error) {
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "mic-permission"
+                        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network"
+                        else -> "stt-$error"
+                    })
+                }
                 override fun onPartialResults(partialResults: Bundle?) {
+                    if (!sessionActive) return
                     partialResults?.firstText()?.let(onPartial)
                 }
                 override fun onResults(results: Bundle?) {
-                    results?.firstText()?.let(onFinal) ?: onError("no speech")
+                    if (!sessionActive) return
+                    sessionActive = false
+                    results?.firstText()?.let(onFinal) ?: onError("no-speech")
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
@@ -107,8 +119,11 @@ class VoiceIO(private val ctx: Context) {
     private fun Bundle.firstText(): String? =
         getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
+    /** Stop + DISCARD the current recognition (fires no onFinal/onError) — used on dismiss/send/kill so
+     *  a late cancellation callback can't re-attach the overlay (the "popup won't close" bug). */
     fun stopListening() = onMain {
-        recognizer?.stopListening()
+        sessionActive = false
+        recognizer?.cancel()
     }
 
     fun destroy() {

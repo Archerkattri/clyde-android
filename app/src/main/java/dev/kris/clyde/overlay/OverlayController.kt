@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -60,6 +61,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +76,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import dev.kris.clyde.R
 import dev.kris.clyde.ui.Body
 import dev.kris.clyde.ui.ClydeColor
 import dev.kris.clyde.ui.ClydeTheme
@@ -121,6 +124,9 @@ class OverlayController(private val appCtx: Context) :
     private var pointerView: ComposeView? = null
     private val clearPointer = Runnable { detachPointer() }
     private val ui = mutableStateOf(OverlayUi())
+    // Set true on dismiss so a late event (a brain status/answer or a confirm arriving AFTER the user
+    // closed the popup) can't re-attach it; cleared by a fresh user-initiated summon.
+    @Volatile private var dismissed = false
 
     /** Wired by the service. [onMic] = stop any speech + listen again; [onSend] = a typed message;
      *  [onDismiss] = the popup was dismissed (stop speech + listening). */
@@ -182,12 +188,14 @@ class OverlayController(private val appCtx: Context) :
 
     fun showSummon() = onMain {
         main.removeCallbacks(settle)
+        dismissed = false
         ui.value = OverlayUi(mode = OverlayMode.Summon, status = "Listening", clawd = ClawdState.Listening)
         attach()
     }
 
-    fun transcript(text: String) = onMain { ui.value = ui.value.copy(transcript = text) }
+    fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text) }
     fun status(text: String) = onMain {
+        if (dismissed) return@onMain
         main.removeCallbacks(settle)
         // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
         val sc = overlayScene(text)
@@ -195,12 +203,13 @@ class OverlayController(private val appCtx: Context) :
         attach()
     }
     fun answer(text: String) = onMain {
+        if (dismissed) return@onMain
         main.removeCallbacks(settle)
         ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", clawd = ClawdState.Success)
         attach()
         main.postDelayed(settle, 2200)
     }
-    fun hide() = onMain { runCatching { onDismiss() }; main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
+    fun hide() = onMain { dismissed = true; runCatching { onDismiss() }; main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
 
     /** Briefly show a pointing Clawd at SCREEN pixel (x,y) — the spot Clyde is about to tap — so device
      *  automation is visible/auditable (a Gemini-can't). NOT_TOUCHABLE, so it never intercepts the tap. */
@@ -238,6 +247,7 @@ class OverlayController(private val appCtx: Context) :
     /** Called on a NanoHTTPD worker thread — blocks until the user approves/denies.
      *  Serialized: a second concurrent confirm is denied so a token never flows to the wrong waiter. */
     fun confirmBlocking(summary: String, details: String?, action: String, params: JSONObject): Pair<Boolean, String?> {
+        if (dismissed) return Pair(false, null) // user closed the popup → auto-deny instead of re-showing it
         if (!confirmPending.compareAndSet(false, true)) return Pair(false, null)
         pendingAction = action
         pendingParams = params
@@ -391,7 +401,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
             ) { if (ui.mode == OverlayMode.Confirm) onDeny() else onClose() }
         )
         when (ui.mode) {
-            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend)
+            OverlayMode.Summon -> SummonPanel(ui, onMic, onSend, onClose)
             OverlayMode.Confirm -> ConfirmPanel(ui, onApprove, onDeny)
             OverlayMode.Hidden -> {}
         }
@@ -399,7 +409,7 @@ private fun OverlayRoot(ui: OverlayUi, onApprove: () -> Unit, onDeny: () -> Unit
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayUi, onMic: () -> Unit, onSend: (String) -> Unit, onClose: () -> Unit) {
     var shown by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { shown = true }
@@ -424,7 +434,14 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Clyde", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ClydeColor.Ink)
                 Spacer(Modifier.weight(1f))
-                Text("✦ Claude", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.TerracottaDeep)
+                Icon(painterResource(R.drawable.ic_claude_mark), contentDescription = null, tint = ClydeColor.TerracottaDeep, modifier = Modifier.size(11.dp))
+                Spacer(Modifier.size(4.dp))
+                Text("Claude", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.TerracottaDeep)
+                Spacer(Modifier.size(12.dp))
+                Box(
+                    Modifier.size(26.dp).pressable(label = "Close") { onClose() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.Close, contentDescription = "close", tint = ClydeColor.Muted, modifier = Modifier.size(18.dp)) }
             }
             Spacer(Modifier.height(10.dp))
             when {
