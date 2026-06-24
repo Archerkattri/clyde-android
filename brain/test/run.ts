@@ -2,6 +2,8 @@
 // boot guard). `npm test`.
 import { Safety, argsHash } from "../src/safety";
 import { offSubscriptionReasons } from "../src/config";
+import { extractFollowups, pickModel } from "../src/agent";
+import { describeAction } from "../src/describe";
 
 let failed = 0;
 function check(name: string, cond: boolean) {
@@ -86,6 +88,21 @@ check("blocks payment via share_text", s.hardStop("share_text", { text: "please 
 s.registerToken("tokK", "send_sms", h);
 s.invalidateAll();
 check("invalidateAll clears tokens", s.consumeToken("tokK", "send_sms", h).ok === false);
+
+// ── ask_user: a clarifying question is SAFE (no confirm token), and describe surfaces the question ──
+check("ask_user is safe (no confirm token)", !s.isConsequential("ask_user"));
+check("ask_user describe shows the question", describeAction("ask_user", { question: "Which app?" }).summary.includes("Which app?"));
+
+// ── followups trailer: stripped from the spoken answer, parsed into ≤3 chips, graceful when absent ──
+const f1 = extractFollowups("Alarm set for 7 AM.\n[[followups]] Set another | Change the time | List alarms");
+check("followups: trailer removed from spoken answer", f1.clean === "Alarm set for 7 AM." && !f1.clean.includes("[[followups]]"));
+check("followups: parses the items", f1.followups.length === 3 && f1.followups[0] === "Set another");
+check("followups: none when the trailer is absent", extractFollowups("Plain answer.").followups.length === 0);
+check("followups: capped at three", extractFollowups("A.\n[[followups]] a | b | c | d | e").followups.length === 3);
+
+// ── smart model routing: trivial turns downgrade to Haiku; real work keeps the user's ceiling ──
+check("pickModel: trivial → haiku", pickModel("what time is it", "opus") === "haiku");
+check("pickModel: real multi-step keeps the ceiling", pickModel("open youtube music revanced, search despacito and play it", "sonnet") === "sonnet");
 
 // ── subscription-only boot guard: every SDK-honored off-subscription switch is detected ──
 const OFF_KEYS = [

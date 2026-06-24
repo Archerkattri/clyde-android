@@ -30,13 +30,14 @@ object Reminders {
 
     /** Create + schedule a reminder. [fireAt] is epoch millis. [action] is an optional command for
      *  Clyde to run when it fires. Returns the stored reminder. */
-    fun set(ctx: Context, text: String, fireAt: Long, action: String?): JSONObject {
+    fun set(ctx: Context, text: String, fireAt: Long, action: String?, repeat: String? = null): JSONObject {
         val id = "r${System.currentTimeMillis()}${(100..999).random()}"
         val obj = JSONObject()
             .put("id", id)
             .put("text", text)
             .put("fireAt", fireAt)
             .put("action", action ?: "")
+            .put("repeat", (repeat ?: "").lowercase().trim()) // "" = one-shot; hourly|daily|weekdays|weekly|monthly
             .put("createdAt", System.currentTimeMillis())
         val arr = load()
         arr.put(obj)
@@ -80,22 +81,58 @@ object Reminders {
             val o = arr.getJSONObject(i)
             val at = o.optLong("fireAt")
             if (at > now) { schedule(ctx, o.optString("id"), at); keep.put(o) }
-            else notify(ctx, o.optString("text")) // missed while off → fire now, then drop
+            else {
+                notify(ctx, o.optString("text")) // missed while off → fire now
+                val next = nextFireAt(at, o.optString("repeat")) // recurring → re-arm next; one-shot → drop
+                if (next != null) { o.put("fireAt", next); schedule(ctx, o.optString("id"), next); keep.put(o) }
+            }
         }
         save(keep)
     }
 
-    /** Pop a fired reminder out of storage (one-shot), returning it (or null if already gone). */
-    fun take(id: String): JSONObject? {
+    /** Handle a fired reminder: return it, and either drop it (one-shot) or advance it to its next
+     *  occurrence and re-arm the alarm (recurring). Returns null if it was already gone. */
+    fun fired(ctx: Context, id: String): JSONObject? {
         val arr = load()
         var found: JSONObject? = null
         val out = JSONArray()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            if (o.optString("id") == id && found == null) found = o else out.put(o)
+            if (o.optString("id") == id && found == null) {
+                found = o
+                val next = nextFireAt(o.optLong("fireAt"), o.optString("repeat"))
+                if (next != null) { o.put("fireAt", next); out.put(o); schedule(ctx, id, next) } // recurring → keep + re-arm
+                // one-shot → not re-added (dropped)
+            } else out.put(o)
         }
         if (found != null) save(out)
         return found
+    }
+
+    /** Next occurrence STRICTLY in the future for a recurring cadence, or null for one-shot/unknown.
+     *  Advances past `now` (bounded) so a phone that was powered off can't immediately re-fire in a loop. */
+    private fun nextFireAt(from: Long, repeat: String): Long? {
+        val r = repeat.lowercase().trim()
+        if (r.isBlank() || r == "none" || r == "once") return null
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = from }
+        val now = System.currentTimeMillis()
+        var guard = 0
+        do {
+            when (r) {
+                "hourly" -> cal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+                "daily" -> cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                "weekly" -> cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
+                "monthly" -> cal.add(java.util.Calendar.MONTH, 1)
+                "weekdays" -> {
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                    while (cal.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.SATURDAY ||
+                        cal.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.SUNDAY
+                    ) cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                }
+                else -> return null // unknown cadence → treat as one-shot
+            }
+        } while (cal.timeInMillis <= now && ++guard < 2000)
+        return cal.timeInMillis
     }
 
     /** The reliable part: a high-priority notification that fires even with the app/brain dead. */

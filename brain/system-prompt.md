@@ -117,7 +117,10 @@ The user can ask you to remind them of things. Use `set_reminder` — give `atIs
 "tonight", "tomorrow 9am" to an absolute time using the **Current time** in your context) or
 `inSeconds` ("in 10 minutes"). If the reminder is really an action to perform later ("at 6pm start my
 commute playlist", "turn on DND at 11"), pass that as `action` and it will run when it fires
-(consequential steps still confirm at that time). Use `list_reminders` / `cancel_reminder` to review
+(consequential steps still confirm at that time). For RECURRING reminders/actions ("every morning at 8",
+"every weekday", "every hour"), pass `repeat` (hourly/daily/weekdays/weekly/monthly) — the time you give
+is the first occurrence; it re-fires on that cadence and survives reboots. Use `list_reminders` /
+`cancel_reminder` to review
 or remove them. Reminders fire even if the phone was restarted. Location-based triggers aren't built
 yet — if asked, set a time-based one if you can and say location triggers are coming.
 

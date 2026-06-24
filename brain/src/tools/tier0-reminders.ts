@@ -9,12 +9,16 @@ export function makeTier0Reminders(ctx: ToolCtx) {
   return [
     tool(
       "set_reminder",
-      'Set a time-based reminder. Give EITHER `atIso` (an absolute LOCAL time, e.g. "2026-06-23T17:00:00") OR `inSeconds` (relative to now). Resolve clock phrasing like "5pm" / "tomorrow 9am" / "tonight" to `atIso` using the current local time from your context. `action` is OPTIONAL — a command Clyde should actually run when it fires (e.g. "start my commute playlist", "set DND on"); omit it for a plain reminder. Location-based triggers are not supported yet.',
+      'Set a time-based reminder. Give EITHER `atIso` (an absolute LOCAL time, e.g. "2026-06-23T17:00:00") OR `inSeconds` (relative to now). Resolve clock phrasing like "5pm" / "tomorrow 9am" / "tonight" to `atIso` using the current local time from your context. `action` is OPTIONAL — a command Clyde should actually run when it fires (e.g. "start my commute playlist", "set DND on"); omit it for a plain reminder. For a RECURRING reminder/action ("every morning at 8", "every weekday", "every hour"), pass `repeat` — the atIso/inSeconds time is then the FIRST occurrence and it re-fires on that cadence (survives reboots). Location-based triggers are not supported yet.',
       {
         text: z.string().describe("what to remind the user about, in their words"),
         atIso: z.string().optional().describe("absolute local time, ISO 8601"),
         inSeconds: z.number().int().positive().optional().describe("fire this many seconds from now"),
         action: z.string().optional().describe("optional command for Clyde to run when it fires"),
+        repeat: z
+          .enum(["hourly", "daily", "weekdays", "weekly", "monthly"])
+          .optional()
+          .describe("make it recurring at this cadence (the time given is the FIRST occurrence); omit for one-time"),
       },
       async (a) => {
         let fireAt: number;
@@ -28,10 +32,10 @@ export function makeTier0Reminders(ctx: ToolCtx) {
           return err("give either atIso (absolute time) or inSeconds (relative).");
         }
         if (fireAt < Date.now() - 1000) return err("that time is in the past — pick a future time.");
-        const r = await ctx.app.reminderSet({ text: a.text, fireAt, action: a.action });
+        const r = await ctx.app.reminderSet({ text: a.text, fireAt, action: a.action, repeat: a.repeat });
         if (!r.ok) return err(r.error ?? "couldn't set the reminder");
         const when = new Date(fireAt).toLocaleString();
-        return text(`Reminder set for ${when}: "${a.text}".${a.action ? ` On fire it will: ${a.action}.` : ""}`);
+        return text(`Reminder set for ${when}${a.repeat ? `, repeating ${a.repeat}` : ""}: "${a.text}".${a.action ? ` On fire it will: ${a.action}.` : ""}`);
       }
     ),
 

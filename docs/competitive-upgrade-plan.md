@@ -81,5 +81,21 @@ app actions, hallucinated notification summaries (pulled), credibility damage fr
   multi-sentence answer the instant it's ready (rest queued after), hitting the natural-feel window.
   Conservative: short answers unchanged; auto-listen rides the final chunk (fires once). **Needs
   on-device audio confirmation** (TTS timing/queueing can't be tested on PC).
-- Next (need on-device iteration): tiered approval + plan-preview; recurring scheduled actions
-  (reschedule-on-fire has alarm-loop risk → test firing on a real phone); barge-in (needs AEC).
+- **Batch 5** (P2 — automations) — shipped **v0.1.46**: recurring scheduled actions
+  (`set_reminder repeat=hourly|daily|weekdays|weekly|monthly`) — Gemini "Scheduled Actions" parity but
+  on-device (privacy edge). Reschedule-on-fire with an anti-loop guard; the firing itself is AlarmManager
+  (verify on a real phone).
+- Next (need on-device iteration): tiered approval + plan-preview; true barge-in (needs AEC).
+
+## Testing done (PC, real subscription brain)
+The arm64 brain can't run on the x86_64 emulator, but the **real brain runs on this PC** on the
+`~/.claude` subscription against the `qa/brain-e2e` mock device. Verified for these batches:
+- **Unit:** `brain` `npm test` — 40+ cases incl. new `extractFollowups`, `ask_user` is SAFE, `pickModel`.
+- **Regression:** full 28-command E2E battery **28/28 PASS** — the honest/terse/screen-aware/technical
+  system-prompt changes regressed nothing (intents, media w/ a11y multi-step, reminders, consequential
+  confirm flow, money hard-stop all intact).
+- **New features (real brain + mock):** follow-up `suggestions` emit and the `[[followups]]` trailer is
+  stripped from the spoken answer; `ask_user` round-trips through `/ask`; recurring `set_reminder` carries
+  the `repeat` cadence. Probes: `qa/brain-e2e/probe-new.mjs`, `probe-recurring.mjs`.
+- **App-side (Kotlin/Compose):** compiles + signed APK; the *visual* feel (chips, voice amplitude, step
+  feed) and *audio* (streaming-TTS timing) and *alarm firing* still need on-device confirmation.

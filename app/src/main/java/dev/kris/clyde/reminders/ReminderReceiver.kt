@@ -15,7 +15,7 @@ class ReminderReceiver : BroadcastReceiver() {
             return
         }
         val id = intent.getStringExtra(Reminders.EXTRA_ID) ?: return
-        val r = Reminders.take(id) ?: return // already cancelled/handled
+        val r = Reminders.fired(ctx, id) ?: return // already cancelled/handled (recurring re-arms its next fire inside)
         val text = r.optString("text")
         val action = r.optString("action")
 

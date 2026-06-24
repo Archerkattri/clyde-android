@@ -118,8 +118,9 @@ class LocalControlServer(
                     val text = body.optString("text")
                     val fireAt = body.optLong("fireAt", 0L)
                     val action = body.optString("action").ifBlank { null }
+                    val repeat = body.optString("repeat").ifBlank { null } // hourly|daily|weekdays|weekly|monthly
                     if (text.isBlank() || fireAt <= 0L) err("text and a future fireAt are required")
-                    else ok(Reminders.set(ctx, text, fireAt, action))
+                    else ok(Reminders.set(ctx, text, fireAt, action, repeat))
                 }
                 uri == "/reminder/list" -> ok(Reminders.list(ctx))
                 uri == "/reminder/cancel" -> {

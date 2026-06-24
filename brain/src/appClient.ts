@@ -74,7 +74,7 @@ export class AppClient {
   }
 
   // ── reminders (time-based; the app schedules an AlarmManager alarm) ──
-  reminderSet(b: { text: string; fireAt: number; action?: string }) {
+  reminderSet(b: { text: string; fireAt: number; action?: string; repeat?: string }) {
     return this.req<unknown>("POST", "/reminder/set", b);
   }
   reminderList() {
