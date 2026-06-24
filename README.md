@@ -7,9 +7,9 @@
 **An Android assistant that replaces Gemini — powered by Claude on your own Pro/Max
 subscription, running on your device.**
 
-[![Watch the demo](docs/media/hero.jpg)](https://github.com/Archerkattri/clyde-android/releases/download/v0.1.50/clyde-promo-nicole.mp4)
+[![Clyde — watch the demo](docs/media/demo.gif)](https://github.com/Archerkattri/clyde-android/releases/download/v0.1.50/clyde-promo-nicole.mp4)
 
-**▶ [Watch the 60-second demo](https://github.com/Archerkattri/clyde-android/releases/download/v0.1.50/clyde-promo-nicole.mp4)**  ·  [Download the APK](https://github.com/Archerkattri/clyde-android/releases/latest)  ·  [Architecture](docs/architecture.md)
+**▶ [Watch the full video, with sound](https://github.com/Archerkattri/clyde-android/releases/download/v0.1.50/clyde-promo-nicole.mp4)**  ·  [Download the APK](https://github.com/Archerkattri/clyde-android/releases/latest)  ·  [Architecture](docs/architecture.md)
 
 </div>
 
@@ -95,7 +95,7 @@ A deliberately flat, anti-slop identity. Warm paper canvas `#FAF9F5`; **Blizzard
 "powered by Claude" signature; Anthropic green `#788C5D` means done. Type is Bricolage Grotesque /
 Hanken Grotesk / Source Serif (Claude's "answer voice") / IBM Plex Mono.
 
-**Clawd** — our own **license-clean** 8-bit pixel crab, drawn natively in Compose (no image/GIF assets;
+**Shiny Clawd** — our own **license-clean** 8-bit pixel crab, drawn natively in Compose (no image/GIF assets;
 grid source in `design/assets/clawd/gen-sprite.mjs`). He's fully rigged — squash & stretch, articulated
 claws, expressions — and recolours blue → terracotta → green to mirror live / asking / done.
 
@@ -112,7 +112,7 @@ claws, expressions — and recolours blue → terracotta → green to mirror liv
 - `app/` — Kotlin + Jetpack Compose shell (+ the embedded-runtime extractor/runner, on-device TTS).
 - `brain/` — TypeScript Claude Agent SDK server + the phone-control tools.
 - `bootstrap/` — builds the embedded Node runtime asset (`bootstrap/README.md`).
-- `design/` — design tokens + our own Clawd sprite source.
+- `design/` — design tokens + our own Shiny Clawd sprite source.
 - `docs/` — architecture, tool catalog, permissions, build phases.
 - `termux/`, `scripts/` — companion setup + build helpers.
 
@@ -125,4 +125,4 @@ See `docs/` and `NOTICE.md` for third-party binary licenses.
 ## Credits
 
 Powered by **Claude** (Anthropic). On-device speech: **Kokoro-82M** + **sherpa-onnx** (Apache-2.0). The
-demo map uses **© OpenStreetMap** data. Clawd is our own original art. Not affiliated with Google.
+demo map uses **© OpenStreetMap** data. Shiny Clawd is our own original art. Not affiliated with Google.
