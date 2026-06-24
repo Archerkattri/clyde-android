@@ -10,17 +10,14 @@ trap 'rm -rf "$TMP"' EXIT
 cd "$TMP"
 unzip -q "$ZIP"   # entries are relative to $PREFIX (files/usr)
 
-# a) Bundle the brain to a single CJS file — no tsx/esbuild needed on the device, which also avoids
-#    esbuild's per-platform native binary (the main ABI-drift risk).
-#    CRITICAL: the SDK (and Node's createRequire) read `import.meta.url`. esbuild's CJS output stubs
-#    `import.meta` to `{}`, so `createRequire(import.meta.url)` becomes `createRequire(undefined)` and
-#    the brain dies on boot. Define import.meta.url to the real file URL via a banner const.
+# a) Bundle the brain to a single CJS file via brain/build-bundle.mjs (NOT the esbuild CLI).
+#    The banner needs require("url") with its quotes intact; passing that banner as a shell CLI arg
+#    strips the inner quotes → the bundle gets `require(url)` (an identifier) → the brain dies on boot
+#    with "ERR_INVALID_ARG_TYPE: require received function url". The build script keeps the banner as a
+#    JS string literal so the quotes always survive. It also defines import.meta.url (esbuild stubs
+#    import.meta to {} in CJS, so createRequire(import.meta.url) would otherwise be createRequire(undefined)).
 ( cd "$ROOT/brain" && npm install --no-audit --no-fund \
-  && npx --yes esbuild src/server.ts \
-       --bundle --platform=node --format=cjs --target=node20 \
-       '--define:import.meta.url=__clyde_meta_url' \
-       '--banner:js=const __clyde_meta_url = require("url").pathToFileURL(__filename).href;' \
-       --outfile="$TMP/opt/clyde-brain/server.js" )
+  && node build-bundle.mjs "$TMP/opt/clyde-brain/server.js" )
 cp "$ROOT/brain/system-prompt.md" "$TMP/opt/clyde-brain/system-prompt.md"
 
 # b) Install the pure-JS claude-code CLI (skip native optional deps like sharp).
