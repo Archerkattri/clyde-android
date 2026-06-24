@@ -34,8 +34,8 @@ android {
         applicationId = "dev.kris.clyde"
         minSdk = 31
         targetSdk = 36
-        versionCode = 49
-        versionName = "0.1.48"
+        versionCode = 50
+        versionName = "0.1.49"
         vectorDrawables { useSupportLibrary = true }
         // arm64-only by design (the embedded brain's libnode.so is arm64; the bootstrap is aarch64).
         // The x86_64 UI-test emulator runs arm64 via translation, so this doesn't affect that path.
@@ -127,6 +127,13 @@ dependencies {
     // Shizuku (Tier 2 — ADB-level control, no root)
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
+
+    // On-device Kokoro-82M neural TTS for the assistant voice (runs the ONNX model on CPU; Apache-2.0).
+    // sherpa-onnx isn't on Maven Central — its prebuilt Android AAR (bundles the JNI .so + Kotlin API)
+    // is fetched from GitHub releases into app/libs/ (gitignored). The ~700 MB voice model is
+    // downloaded on first use, not bundled. Get the AAR: scripts/fetch-sherpa-aar.sh (or the release URL).
+    implementation(files("libs/sherpa-onnx-1.13.3.aar"))
+    implementation("org.apache.commons:commons-compress:1.27.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

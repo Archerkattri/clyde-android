@@ -11,6 +11,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import dev.kris.clyde.util.Prefs
 import java.util.Locale
 
 /** STT (SpeechRecognizer) + TTS (TextToSpeech). Create/call from the main thread. */
@@ -31,6 +32,11 @@ class VoiceIO(private val ctx: Context) {
     // auto-listen fires exactly once — after the WHOLE answer has been spoken, never after the early bit.
     @Volatile private var finalUtteranceId: String? = null
     private var utterSeq = 0
+    // On-device Kokoro neural voice (null → use the system TextToSpeech). Set up by refreshVoice().
+    @Volatile private var kokoro: KokoroTts? = null
+    // When Kokoro is active we collapse streaming TTS (speakEarly + speakRemainder) into ONE synthesis:
+    // the early sentence is buffered here and the whole answer is spoken at once on speakRemainder.
+    private var earlyBuf = ""
 
     // TextToSpeech + SpeechRecognizer are main-thread-affine, but /speak (NanoHTTPD worker) and the
     // brain-event callbacks (IO dispatcher) call in off-main — so every public entry hops to main.
@@ -41,6 +47,19 @@ class VoiceIO(private val ctx: Context) {
 
     init {
         initTts(GOOGLE_TTS) // prefer Google's engine; falls back to the device default if absent
+        refreshVoice()
+    }
+
+    /** Pick the speech engine from [Prefs.voice]: on-device Kokoro when a Kokoro voice is selected and
+     *  its model is downloaded, otherwise the system TextToSpeech. Call after the user changes the voice. */
+    fun refreshVoice() = onMain {
+        val v = Prefs.voice
+        if (KokoroVoices.isKokoro(v) && KokoroModel.isReady(ctx)) {
+            val k = kokoro ?: KokoroTts.create(ctx)?.also { kokoro = it }
+            k?.sid = KokoroVoices.sid[v] ?: 2
+        } else {
+            kokoro?.shutdown(); kokoro = null
+        }
     }
 
     private fun initTts(engine: String?) {
@@ -90,6 +109,7 @@ class VoiceIO(private val ctx: Context) {
     /** Speak [text]; [onDone] runs once if the utterance finishes naturally (not if interrupted). The
      *  utteranceId must be non-null for the progress listener to fire onDone. */
     fun speak(text: String, onDone: () -> Unit = {}) = onMain {
+        kokoro?.let { earlyBuf = ""; speakDone = null; finalUtteranceId = null; it.speak(text, onDone); return@onMain }
         speakDone = onDone
         val id = "final-${utterSeq++}"
         finalUtteranceId = id
@@ -100,6 +120,7 @@ class VoiceIO(private val ctx: Context) {
      *  continuation rides this chunk; the remainder carries it, so auto-listen never fires early. */
     fun speakEarly(text: String) = onMain {
         if (text.isBlank()) return@onMain
+        if (kokoro != null) { earlyBuf = text; return@onMain } // collapse streaming → spoken with the remainder
         finalUtteranceId = null
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "early-${utterSeq++}")
     }
@@ -107,6 +128,7 @@ class VoiceIO(private val ctx: Context) {
     /** Streaming TTS — speak the rest of the answer QUEUED after the early sentence; [onDone]
      *  (auto-listen) fires when THIS finishes, i.e. after the whole answer has been spoken. */
     fun speakRemainder(text: String, onDone: () -> Unit = {}) = onMain {
+        kokoro?.let { val full = earlyBuf + text; earlyBuf = ""; if (full.isBlank()) onDone() else it.speak(full, onDone); return@onMain }
         if (text.isBlank()) { onDone(); return@onMain }
         speakDone = onDone
         val id = "final-${utterSeq++}"
@@ -116,7 +138,7 @@ class VoiceIO(private val ctx: Context) {
 
     /** Interrupt any ongoing speech immediately (tapping mic / sending a new message / dismissing).
      *  Clears the pending continuation so an interrupted answer doesn't also auto-listen. */
-    fun stopSpeaking() = onMain { speakDone = null; finalUtteranceId = null; tts?.stop() }
+    fun stopSpeaking() = onMain { speakDone = null; finalUtteranceId = null; earlyBuf = ""; kokoro?.stop(); tts?.stop() }
 
     fun listen(onPartial: (String) -> Unit, onFinal: (String) -> Unit, onError: (String) -> Unit, onRms: (Float) -> Unit = {}) = onMain {
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
@@ -192,6 +214,8 @@ class VoiceIO(private val ctx: Context) {
         speakDone = null
         recognizer?.destroy()
         recognizer = null
+        kokoro?.shutdown()
+        kokoro = null
         tts?.stop()
         tts?.shutdown()
         tts = null

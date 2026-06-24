@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.RepeatMode
@@ -58,6 +59,8 @@ import dev.kris.clyde.ui.Mono
 import dev.kris.clyde.ui.PrimaryButton
 import dev.kris.clyde.ui.pressable
 import dev.kris.clyde.ui.reduceMotion
+import dev.kris.clyde.voice.KokoroModel
+import dev.kris.clyde.voice.KokoroVoices
 import dev.kris.clyde.util.Prefs
 import kotlinx.coroutines.launch
 
@@ -187,6 +190,44 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
         Spacer(Modifier.height(5.dp))
         Text(
             "Opus — most capable · Sonnet — balanced · Haiku — fastest",
+            fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Eyebrow("assistant voice")
+        Spacer(Modifier.height(6.dp))
+        var voice by remember { mutableStateOf(Prefs.voice) }
+        var voiceReady by remember { mutableStateOf(KokoroModel.isReady(ctx)) }
+        var dl by remember { mutableStateOf(-1f) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            (KokoroVoices.label.toList() + ("system" to "System")).forEach { (id, name) ->
+                val sel = voice == id
+                Box(
+                    Modifier
+                        .background(if (sel) ClydeColor.Blue else ClydeColor.Panel2, RoundedCornerShape(999.dp))
+                        .border(1.dp, if (sel) ClydeColor.Blue else ClydeColor.Line2, RoundedCornerShape(999.dp))
+                        .pressable(label = name) {
+                            voice = id; Prefs.voice = id
+                            if (id != "system" && !voiceReady && dl < 0f) {
+                                dl = 0f
+                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    KokoroModel.ensure(ctx) { p -> dl = p }
+                                    dl = -1f; voiceReady = KokoroModel.isReady(ctx)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 13.dp, vertical = 8.dp),
+                ) { Text(name, fontFamily = Body, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (sel) Color(0xFF06303C) else ClydeColor.Ink) }
+            }
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            when {
+                dl in 0f..1f -> "Downloading voice… ${(dl * 100).toInt()}%  ·  ~700 MB, one time"
+                voice == "system" -> "Using the device's built-in voice"
+                voiceReady -> "On-device neural voice — Bella, Nicole, Adam, Santa, Lewis"
+                else -> "Tap a voice to download it on-device (~700 MB, one time)"
+            },
             fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted,
         )
 

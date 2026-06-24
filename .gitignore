@@ -61,3 +61,6 @@ design/clawd/_*.png
 design/assets/clawd/gif/
 design/assets/clawd/svg/
 design/assets/clawd/_contactsheet.*
+
+# sherpa-onnx prebuilt Android AAR (57MB binary; fetched from GitHub releases, not committed)
+app/libs/*.aar

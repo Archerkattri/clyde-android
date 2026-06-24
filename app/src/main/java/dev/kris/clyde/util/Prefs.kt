@@ -26,6 +26,7 @@ object Prefs {
     private const val KEY_SIGNED_IN = "signed_in"
     private const val KEY_OAUTH_ENC = "oauth_token_enc" // CLAUDE_CODE_OAUTH_TOKEN, encrypted at rest
     private const val KEY_MODEL = "assistant_model"
+    private const val KEY_VOICE = "assistant_voice" // Kokoro voice id, or "system" for OS TextToSpeech
     private const val KEY_DEFAULT_APPS = "default_apps" // JSON {category: package}
     private const val KEY_REMINDERS = "reminders"       // JSON array of {id,text,fireAt,action,createdAt}
     private const val KS_ALIAS = "clyde_prefs_aeskey"
@@ -60,6 +61,12 @@ object Prefs {
     var assistantModel: String
         get() = sp.getString(KEY_MODEL, "sonnet") ?: "sonnet"
         set(value) = sp.edit().putString(KEY_MODEL, value).apply()
+
+    /** Assistant TTS voice: a Kokoro voice id ("af_bella" default · af_nicole · am_adam · am_santa ·
+     *  bm_lewis) used on-device when the Kokoro model is present, or "system" for the OS TextToSpeech. */
+    var voice: String
+        get() = sp.getString(KEY_VOICE, "af_bella") ?: "af_bella"
+        set(value) = sp.edit().putString(KEY_VOICE, value).apply()
 
     /** Preferred app per category ({"music":"<pkg>","maps":…}) as raw JSON. Learned on first use —
      *  the brain asks once, then remembers — and changeable by asking. Plain prefs, not a secret. */
