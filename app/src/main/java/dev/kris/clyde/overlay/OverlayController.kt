@@ -229,8 +229,10 @@ class OverlayController(private val appCtx: Context) :
         main.removeCallbacks(settle)
         // Recognized activities (maps/music/camera/…) play a composed scene; core work keeps the hero state.
         val sc = overlayScene(text)
-        // Accumulate a short "show your work" feed: each distinct status/action line, newest last, cap 4.
-        val steps = if (text.isBlank() || ui.value.steps.lastOrNull() == text) ui.value.steps else (ui.value.steps + text).takeLast(4)
+        // The "show your work" feed is REAL actions only. Generic thinking/status churn stays a single
+        // ActivityLine — otherwise the app's "Thinking…" and the brain's "thinking…" stack as two
+        // near-identical lines. Dedup case-insensitively too.
+        val steps = if (!isAction || text.isBlank() || ui.value.steps.lastOrNull().equals(text, ignoreCase = true)) ui.value.steps else (ui.value.steps + text).takeLast(4)
         ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), steps = steps, actionsSeen = ui.value.actionsSeen + if (isAction) 1 else 0, clawd = ClawdState.Working)
         attach()
         syncWindowMode()

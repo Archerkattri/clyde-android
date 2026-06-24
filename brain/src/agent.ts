@@ -68,7 +68,7 @@ export interface RunArgs {
 }
 
 export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
-  emit({ type: "status", text: "thinking…" });
+  emit({ type: "status", text: "Thinking…" });
 
   const caps = await probeCapabilities(app);
   const ctx: ToolCtx = { app, safety, caps, emit, rish, su };
@@ -193,7 +193,7 @@ export async function runAgent(args: RunArgs, emit: Emit): Promise<void> {
         console.error("[clyde] resume failed; retrying as a fresh session:", e);
         sessionMap.delete(args.sessionId);
         noResume.add(args.sessionId);
-        emit({ type: "status", text: "thinking…" });
+        emit({ type: "status", text: "Thinking…" });
         res = await runOnce(undefined);
       } else {
         throw e;

@@ -56,3 +56,8 @@ design/clawd/_*.png
 # editor / image-viewer lock files
 .~lock.*#
 *.~lock.*#
+
+# AGPL-3.0 Clawd animation references (clawd-on-desk) - local design reference only, never published
+design/assets/clawd/gif/
+design/assets/clawd/svg/
+design/assets/clawd/_contactsheet.*
