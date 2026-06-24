@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 
 /** Read-only / trivially-reversible tools. Everything NOT here is consequential. */
 const SAFE = new Set<string>([
-  "capabilities", "confirm", "ask_user",
+  "capabilities", "confirm", "ask_user", "plan",
   // perception + UI driving (gated by hardStop + halt, not by per-action confirm)
   "ui_dump", "screenshot", "tap", "type_text", "swipe", "global_action",
   "input_tap", "input_text", "input_key", "uiautomator_dump", "screencap",

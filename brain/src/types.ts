@@ -60,6 +60,7 @@ export type AgentEvent =
   | { type: "action"; tool: string; summary: string }
   | { type: "need_confirm"; summary: string; details?: string }
   | { type: "suggestions"; items: string[] } // tappable follow-up chips shown with the answer
+  | { type: "plan"; steps: string[] } // an up-front plan for a multi-step task; UI checks steps off
   | { type: "final"; text: string }
   | { type: "error"; text: string; detail?: string }; // detail = short real reason, for diagnostics
 

@@ -114,6 +114,8 @@ data class OverlayUi(
     val suggestions: List<String> = emptyList(), // tappable follow-up chips shown under an answer
     val amplitude: Float = 0f, // live mic level 0..1 while listening (drives the voice light)
     val steps: List<String> = emptyList(), // recent action/status lines — the "show your work" feed
+    val plannedSteps: List<String> = emptyList(), // up-front plan for a multi-step task (checked off live)
+    val actionsSeen: Int = 0, // real tool actions fired this turn → which planned step is current
 )
 
 /** The user's answer to an ask_user question — by voice (verbatim words in [text]) or by tapping. */
@@ -221,7 +223,7 @@ class OverlayController(private val appCtx: Context) :
     }
 
     fun transcript(text: String) = onMain { if (dismissed) return@onMain; ui.value = ui.value.copy(transcript = text, suggestions = emptyList()) }
-    fun status(text: String) = onMain {
+    fun status(text: String, isAction: Boolean = false) = onMain {
         if (dismissed) return@onMain
         if (ui.value.mode == OverlayMode.Confirm || ui.value.mode == OverlayMode.Ask) return@onMain // don't clobber an active modal
         main.removeCallbacks(settle)
@@ -229,14 +231,14 @@ class OverlayController(private val appCtx: Context) :
         val sc = overlayScene(text)
         // Accumulate a short "show your work" feed: each distinct status/action line, newest last, cap 4.
         val steps = if (text.isBlank() || ui.value.steps.lastOrNull() == text) ui.value.steps else (ui.value.steps + text).takeLast(4)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), steps = steps, clawd = ClawdState.Working)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = text, answer = "", scene = sc, suggestions = emptyList(), steps = steps, actionsSeen = ui.value.actionsSeen + if (isAction) 1 else 0, clawd = ClawdState.Working)
         attach()
         syncWindowMode()
     }
     fun answer(text: String) = onMain {
         if (dismissed) return@onMain
         main.removeCallbacks(settle)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", steps = emptyList(), clawd = ClawdState.Success)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, answer = text, status = "", scene = "", steps = emptyList(), plannedSteps = emptyList(), actionsSeen = 0, clawd = ClawdState.Success)
         attach()
         syncWindowMode()
         main.postDelayed(settle, 2200)
@@ -254,6 +256,16 @@ class OverlayController(private val appCtx: Context) :
         ui.value = ui.value.copy(amplitude = level)
     }
 
+    /** Show an up-front plan for a multi-step task; each step checks off as real actions fire. */
+    fun plan(steps: List<String>) = onMain {
+        if (dismissed) return@onMain
+        if (ui.value.mode == OverlayMode.Confirm || ui.value.mode == OverlayMode.Ask) return@onMain
+        main.removeCallbacks(settle)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, plannedSteps = steps.take(7), actionsSeen = 0, answer = "", status = "Here's the plan", scene = "", suggestions = emptyList(), clawd = ClawdState.Working)
+        attach()
+        syncWindowMode()
+    }
+
     /** True while the popup is on screen (not dismissed) — guards auto-listen after a spoken answer. */
     fun isShowing(): Boolean = !dismissed
 
@@ -262,7 +274,7 @@ class OverlayController(private val appCtx: Context) :
     fun listenAgain() = onMain {
         if (dismissed) return@onMain
         main.removeCallbacks(settle)
-        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = "Listening", steps = emptyList(), clawd = ClawdState.Listening)
+        ui.value = ui.value.copy(mode = OverlayMode.Summon, status = "Listening", steps = emptyList(), plannedSteps = emptyList(), actionsSeen = 0, clawd = ClawdState.Listening)
         attach()
         syncWindowMode()
     }
@@ -665,7 +677,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SummonPanel(ui: OverlayU
             }
             Spacer(Modifier.height(8.dp))
             // During a multi-step task, show the recent steps ("show your work"); otherwise one status line.
-            if (ui.clawd == ClawdState.Working && ui.steps.size > 1) StepsFeed(ui) else ActivityLine(ui)
+            if (ui.clawd == ClawdState.Working && (ui.plannedSteps.isNotEmpty() || ui.steps.size > 1)) StepsFeed(ui) else ActivityLine(ui)
             Spacer(Modifier.height(10.dp))
             when {
                 ui.answer.isNotBlank() -> Row(Modifier.height(IntrinsicSize.Min)) {
@@ -925,6 +937,28 @@ private fun ActivityLine(ui: OverlayUi) {
  *  the current one pulsing. Step-by-step transparency that Gemini/Siri don't offer. */
 @Composable
 private fun StepsFeed(ui: OverlayUi) {
+    // With an up-front plan, render it and check steps off by how many real actions have fired (approximate
+    // — a step can take several actions); otherwise the recent-actions "show your work" feed.
+    val planned = ui.plannedSteps
+    if (planned.isNotEmpty()) {
+        val current = (ui.actionsSeen - 1).coerceIn(0, planned.lastIndex)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            planned.forEachIndexed { i, s ->
+                val done = ui.actionsSeen > planned.size || i < current
+                val isCurrent = !done && i == current && ui.actionsSeen >= 1
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    when {
+                        done -> Text("✓", fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF788C5D))
+                        isCurrent -> PulseDot(ClydeColor.Blue, true)
+                        else -> Text("○", fontFamily = Mono, fontSize = 10.sp, color = ClydeColor.Muted)
+                    }
+                    Spacer(Modifier.size(7.dp))
+                    Text(s, fontFamily = Mono, fontSize = 11.sp, color = if (isCurrent) ClydeColor.Ink else ClydeColor.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        return
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ui.steps.forEachIndexed { i, s ->
             val latest = i == ui.steps.lastIndex

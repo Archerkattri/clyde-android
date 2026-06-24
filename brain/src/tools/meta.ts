@@ -59,5 +59,15 @@ export function makeMetaTools(ctx: ToolCtx) {
         );
       }
     ),
+
+    tool(
+      "plan",
+      'BEFORE starting a task that will take several steps (roughly 3+), call this ONCE with a short ordered list of the steps you intend, in plain user-facing language (e.g. ["Open YouTube Music", "Search for the song", "Play the top result"]). Clyde shows the plan to the user and checks each step off as you carry it out — so multi-step work is never a surprise. Skip it for one-shot answers or a single action.',
+      { steps: z.array(z.string()).min(2).max(7).describe("the ordered steps you intend to take, short and user-facing") },
+      async (a) => {
+        ctx.emit({ type: "plan", steps: a.steps.map((s) => String(s)) });
+        return text("Plan shown to the user. Now carry it out step by step.");
+      }
+    ),
   ];
 }

@@ -91,6 +91,7 @@ check("invalidateAll clears tokens", s.consumeToken("tokK", "send_sms", h).ok ==
 
 // ── ask_user: a clarifying question is SAFE (no confirm token), and describe surfaces the question ──
 check("ask_user is safe (no confirm token)", !s.isConsequential("ask_user"));
+check("plan is safe (no confirm token)", !s.isConsequential("plan"));
 check("ask_user describe shows the question", describeAction("ask_user", { question: "Which app?" }).summary.includes("Which app?"));
 
 // ── followups trailer: stripped from the spoken answer, parsed into ≤3 chips, graceful when absent ──

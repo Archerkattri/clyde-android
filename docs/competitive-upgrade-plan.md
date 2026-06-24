@@ -85,7 +85,12 @@ app actions, hallucinated notification summaries (pulled), credibility damage fr
   (`set_reminder repeat=hourly|daily|weekdays|weekly|monthly`) — Gemini "Scheduled Actions" parity but
   on-device (privacy edge). Reschedule-on-fire with an anti-loop guard; the firing itself is AlarmManager
   (verify on a real phone).
-- Next (need on-device iteration): tiered approval + plan-preview; true barge-in (needs AEC).
+- **Batch 6** (P1 — agentic transparency) — shipped **v0.1.47**: plan-preview. The agent calls `plan`
+  first for a multi-step task; the overlay shows the up-front step list and checks each off as it works.
+  Verified: a play task emits the plan before the actions.
+- Remaining: true barge-in (talk over Clyde — needs acoustic echo cancellation + a real mic, can't be
+  built blind); a finer 3-tier auto-approval/undo refinement (the safe/consequential split already covers
+  the core). Both are on-device-iteration items.
 
 ## Testing done (PC, real subscription brain)
 The arm64 brain can't run on the x86_64 emulator, but the **real brain runs on this PC** on the
@@ -96,6 +101,7 @@ The arm64 brain can't run on the x86_64 emulator, but the **real brain runs on t
   confirm flow, money hard-stop all intact).
 - **New features (real brain + mock):** follow-up `suggestions` emit and the `[[followups]]` trailer is
   stripped from the spoken answer; `ask_user` round-trips through `/ask`; recurring `set_reminder` carries
-  the `repeat` cadence. Probes: `qa/brain-e2e/probe-new.mjs`, `probe-recurring.mjs`.
+  the `repeat` cadence; multi-step tasks emit an up-front `plan`. Probes: `qa/brain-e2e/probe-new.mjs`,
+  `probe-recurring.mjs`, `probe-plan.mjs`.
 - **App-side (Kotlin/Compose):** compiles + signed APK; the *visual* feel (chips, voice amplitude, step
   feed) and *audio* (streaming-TTS timing) and *alarm firing* still need on-device confirmation.

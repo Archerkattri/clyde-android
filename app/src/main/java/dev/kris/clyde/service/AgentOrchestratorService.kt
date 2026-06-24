@@ -328,8 +328,19 @@ class AgentOrchestratorService : Service() {
                 when (ev.optString("type")) {
                     "status" -> overlay.status(ev.optString("text"))
                     "action" -> {
-                        overlay.status(ev.optString("summary").ifBlank { ev.optString("tool") })
+                        val tool = ev.optString("tool")
+                        // Count only real device actions toward plan progress — not meta/infra tools.
+                        val meta = tool.equals("ToolSearch", true) || tool == "capabilities" || tool == "plan" || tool == "confirm" || tool == "ask_user"
+                        overlay.status(ev.optString("summary").ifBlank { tool }, isAction = !meta)
                         sb.setLength(0); earlySpoken = false; earlyText = "" // the answer comes AFTER the last tool call
+                    }
+                    "plan" -> {
+                        val arr = ev.optJSONArray("steps")
+                        if (arr != null) {
+                            val st = ArrayList<String>()
+                            for (i in 0 until arr.length()) arr.optString(i).takeIf { it.isNotBlank() }?.let { st.add(it) }
+                            if (st.isNotEmpty()) overlay.plan(st)
+                        }
                     }
                     "delta" -> {
                         sb.append(ev.optString("text"))
