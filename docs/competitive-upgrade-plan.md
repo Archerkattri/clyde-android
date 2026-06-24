@@ -103,5 +103,20 @@ The arm64 brain can't run on the x86_64 emulator, but the **real brain runs on t
   stripped from the spoken answer; `ask_user` round-trips through `/ask`; recurring `set_reminder` carries
   the `repeat` cadence; multi-step tasks emit an up-front `plan`. Probes: `qa/brain-e2e/probe-new.mjs`,
   `probe-recurring.mjs`, `probe-plan.mjs`.
-- **App-side (Kotlin/Compose):** compiles + signed APK; the *visual* feel (chips, voice amplitude, step
-  feed) and *audio* (streaming-TTS timing) and *alarm firing* still need on-device confirmation.
+- **On-device (emulator `Clyde_Pixel7Pro_API36` + the real PC brain over an adb bridge — `adb reverse
+  tcp:8765` app→brain, `adb forward tcp:8766` brain→app; the embedded arm64 brain still can't run on
+  x86_64, re-confirmed by the `EM_AARCH64 (183) vs EM_X86_64 (62)` link error shown in the overlay):**
+  - **UI renders** (screencap): the **ask_user picker** (numbered options + "say anything" catch-all +
+    listening row), the **honest answer card** ("the timer tool failed to run" — honesty, not a fake
+    "done"), the **reminder overlay**, the **summon overlay** (Clawd + voice light), the **"thinking…"
+    status feed**, and **"Listening…" auto-relisten** after the answer. The bridge drove real automation
+    (opened the Clock app from a multi-step action).
+  - **Recurring alarm fire + reschedule** (deterministic): `dumpsys alarm` `origWhen` advanced by exactly
+    +86,400,000 ms (one day) after the alarm fired, with the alarm still scheduled — proves
+    reschedule-on-fire + the anti-loop guard on real AlarmManager.
+  - **Streaming-TTS gating** (logcat): `onDone id=final-N (final=final-N)` matched → fired the auto-listen
+    continuation once, on the final utterance only, never on an early chunk.
+  - Granted from adb: SAW (`appops`), `SCHEDULE_EXACT_ALARM`, RECORD_AUDIO, accessibility.
+- **Still strictly hardware (no emulator acoustic path):** full-duplex barge-in feel, TTS audio quality,
+  multi-hour/OEM alarm realism. Barge-in's *achievable* form (tap-to-interrupt + re-listen-after-TTS) is
+  already implemented and its auto-relisten was observed on-device.
