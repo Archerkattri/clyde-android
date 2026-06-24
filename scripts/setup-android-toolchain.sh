@@ -3,7 +3,10 @@
 # Portable Temurin JDK 17 + Android cmdline-tools + platform/build-tools, then local.properties.
 # Uses PowerShell Expand-Archive for unzip (Git Bash tar mis-parses C: paths). Safe to re-run.
 set -u
-ROOT="C:/Users/krish/clyde-toolchain"
+# Toolchain root: override with CLYDE_TOOLCHAIN, else <home>/clyde-toolchain (USERPROFILE on Git-Bash/Windows).
+ROOT="${CLYDE_TOOLCHAIN:-${USERPROFILE:-$HOME}/clyde-toolchain}"
+ROOT="${ROOT//\\//}"   # normalize Windows backslashes (USERPROFILE is C:\Users\<you>)
+REPO="$(cd "$(dirname "$0")/.." && pwd)"   # repo root, derived from this script's own location
 JDK_DIR="$ROOT/jdk"
 SDK_DIR="$ROOT/android-sdk"
 LOG="$ROOT/setup.log"
@@ -61,7 +64,7 @@ echo "[sdk] installing platform-tools, platforms;android-35, build-tools;35.0.0 
 
 # ---------- 3. local.properties ----------
 WINSDK="$(echo "$SDK_DIR" | sed 's#/#\\\\#g')"
-printf 'sdk.dir=%s\n' "$WINSDK" > "C:/Users/krish/Documents/claudeandapp/local.properties"
+printf 'sdk.dir=%s\n' "$WINSDK" > "$REPO/local.properties"
 echo "[ok] wrote local.properties -> $WINSDK"
 
 echo "=== DONE. JAVA_HOME=$JDK_DIR  ANDROID_SDK=$SDK_DIR ==="

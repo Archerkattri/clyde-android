@@ -8,7 +8,7 @@ How to build, run, and recover Clyde. (Living doc; grows with the app.)
   scripts/build-apk.sh          # → app/build/outputs/apk/debug/app-debug.apk
   scripts/install-apk.sh        # adb install -r  (or rish pm install on-device)
   ```
-- This dev machine uses a portable toolchain at `C:\Users\krish\clyde-toolchain`
+- This dev machine uses a portable toolchain at `%USERPROFILE%\clyde-toolchain`
   (JDK 17 + Android SDK 35 + Gradle 8.10.2). `local.properties` points at it.
   Build directly: `JAVA_HOME=…/jdk …/gradle/bin/gradle :app:assembleDebug`.
 

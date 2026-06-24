@@ -11,7 +11,7 @@ An Android app that replaces Gemini as the system assistant, driven by **Claude 
 - Do not build an in-app Anthropic API client. Device intelligence comes from the Agent SDK process, not a homemade client.
 
 ## Where this repo is built vs where it runs
-- **Built/edited on:** a Windows 11 PC (this machine). Toolchain now installed under `C:\Users\krish\clyde-toolchain` (JDK, Android SDK 36, Gradle), plus Android Studio (build with its JBR 21) and **WSL2 Ubuntu-24.04 + Docker** (for the embedded-runtime bootstrap build). Node 20 + git present. The app DOES compile here (`gradlew :app:assembleDebug` on JBR 21).
+- **Built/edited on:** a Windows 11 PC (this machine). Toolchain now installed under `%USERPROFILE%\clyde-toolchain` (JDK, Android SDK 36, Gradle), plus Android Studio (build with its JBR 21) and **WSL2 Ubuntu-24.04 + Docker** (for the embedded-runtime bootstrap build). Node 20 + git present. The app DOES compile here (`gradlew :app:assembleDebug` on JBR 21).
 - **`brain/` runs in:** Termux on the Android phone (Node). It is `tsc`-buildable on the PC for type-checking.
 - **`app/` runs on:** the Android phone. Build the APK with Android Studio or on-device Gradle (see `scripts/`). The PC can edit but not compile it until the Android SDK is installed.
 
