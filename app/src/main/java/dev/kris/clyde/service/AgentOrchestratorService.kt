@@ -40,6 +40,9 @@ class AgentOrchestratorService : Service() {
         private const val TAG = "Clyde"
         private const val BRAIN_VERSION = "0.1.0" // structural runtime version (node/CLI/libs layout)
 
+        // The running service, so Settings can apply a voice change live mid-session (null when stopped).
+        @Volatile var instance: AgentOrchestratorService? = null
+
         // ask_user voice-pick: number/ordinal words → 1-based option position, and filler words to ignore.
         private val NUMBER_WORDS = mapOf(
             "one" to 1, "two" to 2, "three" to 3, "four" to 4, "five" to 5, "six" to 6,
@@ -64,6 +67,7 @@ class AgentOrchestratorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         voice = VoiceIO(this)
         overlay = OverlayController(applicationContext)
         // Mic button: stop any speech, reset to Listening, and listen again (never just close).
@@ -433,9 +437,13 @@ class AgentOrchestratorService : Service() {
         getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notif)
     }
 
+    /** Apply a voice change from Settings live, without waiting for the next summon. */
+    fun refreshVoice() { if (::voice.isInitialized) voice.refreshVoice() }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         overlay.cancelPendingConfirm() // release a parked confirm worker before closing the server
         overlay.cancelPendingAsk()
         brain.stop()

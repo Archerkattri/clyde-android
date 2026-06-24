@@ -55,8 +55,18 @@ class VoiceIO(private val ctx: Context) {
     fun refreshVoice() = onMain {
         val v = Prefs.voice
         if (KokoroVoices.isKokoro(v) && KokoroModel.isReady(ctx)) {
-            val k = kokoro ?: KokoroTts.create(ctx)?.also { kokoro = it }
-            k?.sid = KokoroVoices.sid[v] ?: 2
+            val sid = KokoroVoices.sid[v] ?: 2
+            val existing = kokoro
+            if (existing != null) {
+                existing.sid = sid // switching between Kokoro voices is instant — just change the speaker id
+            } else {
+                // first time: loading the ~310 MB ONNX is heavy, so build the engine off the main thread
+                Thread {
+                    val k = KokoroTts.create(ctx) ?: return@Thread
+                    k.sid = sid
+                    onMain { if (kokoro == null) kokoro = k else k.shutdown() }
+                }.start()
+            }
         } else {
             kokoro?.shutdown(); kokoro = null
         }

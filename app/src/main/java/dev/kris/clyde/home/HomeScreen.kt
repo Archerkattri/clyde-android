@@ -213,7 +213,10 @@ fun HomeScreen(onAsk: () -> Unit, onConnectBrain: () -> Unit) {
                                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                     KokoroModel.ensure(ctx) { p -> dl = p }
                                     dl = -1f; voiceReady = KokoroModel.isReady(ctx)
+                                    AgentOrchestratorService.instance?.refreshVoice() // apply once downloaded
                                 }
+                            } else {
+                                AgentOrchestratorService.instance?.refreshVoice() // apply live mid-session
                             }
                         }
                         .padding(horizontal = 13.dp, vertical = 8.dp),
