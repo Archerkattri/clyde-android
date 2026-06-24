@@ -21,6 +21,7 @@ local.properties
 *.keystore
 *.jks
 keystore.properties
+*.bak
 .cxx/
 
 # --- IDE / OS ---
