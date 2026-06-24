@@ -111,7 +111,7 @@ object DeviceIntents {
         return start(ctx, Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
             putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
             putExtra(SearchManager.QUERY, query)
-            // Target a specific player (e.g. a ReVanced build) when the brain resolved one; otherwise
+            // Target a specific media player when the brain resolved one; otherwise
             // the system routes to the default media app.
             if (pkg.isNotBlank()) setPackage(pkg)
         })

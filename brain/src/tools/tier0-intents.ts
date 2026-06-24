@@ -20,10 +20,10 @@ export function makeTier0Intents(ctx: ToolCtx) {
 
     tool(
       "play_media",
-      "Play music/audio by search — a song, artist, album, playlist, podcast, or station (Android play-from-search). With no `package`, the SYSTEM picks the player (may not be the user's preferred app). To play in a SPECIFIC app (a modded/ReVanced build, or when several music apps are installed), resolve it with list_apps and pass its `package`. If a targeted play doesn't land, open that app with launch_app and drive its search UI instead.",
+      "Play music/audio by search — a song, artist, album, playlist, podcast, or station (Android play-from-search). With no `package`, the SYSTEM picks the player (may not be the user's preferred app). To play in a SPECIFIC app (a particular build, or when several music apps are installed), resolve it with list_apps and pass its `package`. If a targeted play doesn't land, open that app with launch_app and drive its search UI instead.",
       {
         query: z.string().describe('what to play, e.g. "Let Down by Radiohead"'),
-        package: z.string().optional().describe("exact package to play in (from list_apps), e.g. a ReVanced build; omit to let the system choose"),
+        package: z.string().optional().describe("exact package to play in (from list_apps); omit to let the system choose"),
       },
       async (a) => fire(
         "play_media",

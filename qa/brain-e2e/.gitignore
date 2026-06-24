@@ -1,9 +1,0 @@
-# never commit anything secret or transient from the E2E harness
-secret.env
-*.log
-*.out
-report-*.md
-*.token
-# transient test artifacts (screenshots, dumps, the signed_in pref hack)
-*.png
-*.xml

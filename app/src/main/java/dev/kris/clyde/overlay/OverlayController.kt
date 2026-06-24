@@ -936,7 +936,7 @@ private fun ActivityLine(ui: OverlayUi) {
 }
 
 /** "Show your work": the last few actions Clyde has taken this turn — prior steps marked done (green),
- *  the current one pulsing. Step-by-step transparency that Gemini/Siri don't offer. */
+ *  the current one pulsing — step-by-step transparency during a multi-step task. */
 @Composable
 private fun StepsFeed(ui: OverlayUi) {
     // With an up-front plan, render it and check steps off by how many real actions have fired (approximate
