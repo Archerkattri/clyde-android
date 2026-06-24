@@ -3,8 +3,8 @@
 # Portable Temurin JDK 17 + Android cmdline-tools + platform/build-tools, then local.properties.
 # Uses PowerShell Expand-Archive for unzip (Git Bash tar mis-parses C: paths). Safe to re-run.
 set -u
-# Toolchain root: override with CLYDE_TOOLCHAIN, else <home>/clyde-toolchain (USERPROFILE on Git-Bash/Windows).
-ROOT="${CLYDE_TOOLCHAIN:-${USERPROFILE:-$HOME}/clyde-toolchain}"
+# Toolchain root: override with CLYDE_TOOLCHAIN, else <home>/clyde-workspace/toolchain (USERPROFILE on Git-Bash/Windows).
+ROOT="${CLYDE_TOOLCHAIN:-${USERPROFILE:-$HOME}/clyde-workspace/toolchain}"
 ROOT="${ROOT//\\//}"   # normalize Windows backslashes (USERPROFILE is C:\Users\<you>)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"   # repo root, derived from this script's own location
 JDK_DIR="$ROOT/jdk"

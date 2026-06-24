@@ -22,6 +22,7 @@ import fi.iki.elonen.NanoHTTPD
 import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -39,6 +40,7 @@ class AgentOrchestratorService : Service() {
         private const val NOTIF_ID = 42
         private const val TAG = "Clyde"
         private const val BRAIN_VERSION = "0.1.0" // structural runtime version (node/CLI/libs layout)
+        private const val STT_WATCHDOG_MS = 10_000L // recover the overlay if the recognizer never calls back at all
 
         // The running service, so Settings can apply a voice change live mid-session (null when stopped).
         @Volatile var instance: AgentOrchestratorService? = null
@@ -64,6 +66,7 @@ class AgentOrchestratorService : Service() {
     private val sessionId = "app-${System.currentTimeMillis()}"
     private var listenRetries = 0 // transient STT errors retry quietly a couple of times before nagging
     private var askListenRetries = 0 // same quiet-retry idea for the ask_user voice-pick listen loop
+    private var listenWatchdog: Job? = null // fires if a listen cycle yields no callback at all (a hung recognizer)
 
     override fun onCreate() {
         super.onCreate()
@@ -188,11 +191,13 @@ class AgentOrchestratorService : Service() {
      *  [fresh] true resets the retry counter (a user-initiated listen); the quiet auto-retry passes false. */
     private fun startListening(fresh: Boolean = true) {
         if (fresh) listenRetries = 0
+        listenWatchdog?.cancel()
         voice.listen(
-            onPartial = { overlay.transcript(it) },
+            onPartial = { armSttWatchdog(); overlay.transcript(it) }, // speech heard → recognizer is alive; reset the hang timer
             onRms = { overlay.amplitude(it) },
-            onFinal = { text -> listenRetries = 0; if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
+            onFinal = { text -> listenWatchdog?.cancel(); listenRetries = 0; if (text.isNotBlank()) { overlay.transcript(text); handle(text) } },
             onError = { err ->
+                listenWatchdog?.cancel()
                 val fatal = err == "mic-permission" || err == "speech recognition unavailable"
                 if (!fatal && listenRetries < 2 && overlay.isShowing()) {
                     // Transient STT hiccups (busy / no-speech / network / stt-*) are common; retry quietly
@@ -206,13 +211,32 @@ class AgentOrchestratorService : Service() {
                         "mic-permission" -> overlay.status("Mic access is off — enable it for Clyde in Settings")
                         "speech recognition unavailable" -> overlay.status("Speech isn't available on this device")
                         "network" -> overlay.status("No connection for speech recognition")
-                        "no-speech" -> {} // heard nothing even after retries → just go quiet, no nag
+                        // Heard nothing even after retries → leave the Listening state quietly (no nag). Without
+                        // this the overlay sat on "Listening…" forever after the mic had already closed.
+                        "no-speech" -> overlay.goQuiet()
                         else -> overlay.status("Didn't catch that — tap the mic to try again")
                     }
                     Log.w(TAG, "Speech recognition error (final): $err")
                 }
             },
         )
+        armSttWatchdog()
+    }
+
+    /** A recognizer can bind but then never call back at all — no partial, no result, no error. When
+     *  that happens nothing in [startListening] fires and the overlay would sit on "Listening…" forever
+     *  (the "infinitely stuck on listening" bug). Re-armed on every listen and on each partial; if a full
+     *  window passes with zero recognizer activity, give up gracefully and drop out of the Listening state. */
+    private fun armSttWatchdog() {
+        listenWatchdog?.cancel()
+        listenWatchdog = scope.launch {
+            delay(STT_WATCHDOG_MS)
+            if (overlay.isShowing()) {
+                Log.w(TAG, "STT watchdog fired — no recognizer activity in ${STT_WATCHDOG_MS}ms; recovering a stuck listen")
+                voice.stopListening()
+                overlay.goQuiet()
+            }
+        }
     }
 
     /** When Clyde finishes speaking, listen for a reply automatically — so it's a back-and-forth

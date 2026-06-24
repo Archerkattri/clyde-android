@@ -280,6 +280,21 @@ class OverlayController(private val appCtx: Context) :
         attach()
         syncWindowMode()
     }
+    /** The mic closed with nothing to act on — the user stayed silent, or the recognizer gave up /
+     *  never reported back. Leave the "Listening" state without nagging: keep a visible answer (rest the
+     *  mascot, drop the live cue) so a conversation's reply stays readable, otherwise quietly dismiss.
+     *  Without this the overlay froze on "Listening…" forever once the recognizer had already closed. */
+    fun goQuiet() = onMain {
+        if (dismissed) return@onMain
+        if (ui.value.mode != OverlayMode.Summon) return@onMain // never disturb a Confirm/Ask modal
+        if (ui.value.clawd != ClawdState.Listening) return@onMain // already moved on (working / answering)
+        main.removeCallbacks(settle)
+        if (ui.value.answer.isNotBlank()) {
+            ui.value = ui.value.copy(status = "", clawd = ClawdState.Idle, amplitude = 0f) // keep the reply, rest
+        } else {
+            hide() // bare summon + silence → quietly dismiss, like a tap outside
+        }
+    }
     fun hide() = onMain { dismissed = true; runCatching { onDismiss() }; main.removeCallbacks(settle); main.removeCallbacks(clearPointer); detachPointer(); ui.value = OverlayUi(); detach() } // clear state so the next summon never shows a stale frame
 
     /** Briefly show a pointing Clawd at SCREEN pixel (x,y) — the spot Clyde is about to tap — so device

@@ -65,8 +65,9 @@ design/assets/clawd/_contactsheet.*
 # sherpa-onnx prebuilt Android AAR (57MB binary; fetched from GitHub releases, not committed)
 app/libs/*.aar
 
-# Internal / process / debug material — kept local only, never published
+# Internal / process / debug material ï¿½ kept local only, never published
 CLAUDE.md
+AGENTS.md
 CLAUDE_CODE_PROMPT.md
 RUN.md
 qa/
@@ -77,5 +78,7 @@ docs/QA-BUGS.md
 docs/SECURITY-AUDIT.md
 docs/START-HERE.md
 docs/RUNBOOK.md
+docs/HANDOFF.md
 docs/repo-structure.md
 design/clawd/CATALOG.md
+session-export-*.zip
