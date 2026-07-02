@@ -36,6 +36,21 @@ The wedge isn't out-featuring Google or Apple — it's **reliability, honesty, g
 - 🧩 **Automates _any_ app** — through Android intents → accessibility → ADB → root, not a hand-picked whitelist.
 - 🔒 **Runs on your device**, under your own Claude subscription. Nothing phones home.
 
+## Positioning (2026)
+
+The big labs are converging on phone automation, but from the opposite direction, and the lane they leave open is exactly Clyde's.
+
+- **Google Gemini** now drives apps on-device, but through a **vendor whitelist** — a curated set of integrated apps, rolling out on Pixel and Galaxy hardware. If your app isn't on the list, Gemini can't touch it.
+- **Anthropic's Orbit** (in testing) is the closest thing to Clyde: a Claude agent that operates the phone for you. When it ships it will overlap with what Clyde does, and with first-party polish. Worth saying plainly rather than pretending otherwise.
+
+What Clyde does differently is **generality and ownership**:
+
+- **Any app, no whitelist.** Clyde reaches every app through the ladder of Android intents → accessibility → ADB (Shizuku) → **root** (the T0–T3 tiers below), not a hand-picked integration list. On a rooted phone it can drive anything on the screen.
+- **Root-tier control.** T3 (`su`) gives event injection, any permission, and persistence — a level a first-party assistant will not hand to a general agent.
+- **Your subscription, your device.** Auth is your own Claude Pro/Max login (`claude login`); there's no per-token API billing, nothing phones home, and the brain refuses to start if `ANTHROPIC_API_KEY` is set.
+
+The honest read: if Orbit ships and covers what you need, use it — it will be smoother on the mainstream path. Clyde is built for the **power-user / rooted tier** a whitelisted or first-party agent won't reach: full, local control of *any* app, under your own subscription, private by construction.
+
 ## See it
 
 ### Plan anything
