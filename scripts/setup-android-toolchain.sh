@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Portable, non-interactive Android build toolchain for this PC (no admin installer).
-# Portable Temurin JDK 17 + Android cmdline-tools + platform/build-tools, then local.properties.
+# Portable Temurin JDK 21 + Android cmdline-tools + platform/build-tools, then local.properties.
 # Uses PowerShell Expand-Archive for unzip (Git Bash tar mis-parses C: paths). Safe to re-run.
 set -u
 # Toolchain root: override with CLYDE_TOOLCHAIN, else <home>/clyde-workspace/toolchain (USERPROFILE on Git-Bash/Windows).
@@ -19,19 +19,19 @@ unzip_ps() { # $1=zip  $2=dest
     && echo "[unzip] ok -> $2"
 }
 
-# ---------- 1. JDK 17 ----------
+# ---------- 1. JDK 21 ----------
 if [ ! -x "$JDK_DIR/bin/java.exe" ]; then
   if [ ! -s "$ROOT/jdk.zip" ]; then
-    echo "[jdk] downloading Temurin 17..."
-    curl -sL -o "$ROOT/jdk.zip" "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
+    echo "[jdk] downloading Temurin 21..."
+    curl -fL --retry 3 -o "$ROOT/jdk.zip" "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
   else
     echo "[jdk] reusing existing jdk.zip ($(du -h "$ROOT/jdk.zip" | cut -f1))"
   fi
   echo "[jdk] extracting..."
   rm -rf "$ROOT/jdk-extract"; mkdir -p "$ROOT/jdk-extract"
   unzip_ps "$ROOT/jdk.zip" "$ROOT/jdk-extract"
-  inner="$(find "$ROOT/jdk-extract" -maxdepth 1 -type d -name 'jdk-17*' | head -1)"
-  if [ -z "$inner" ]; then echo "[jdk] FAILED: no jdk-17* dir after extract"; ls -la "$ROOT/jdk-extract"; exit 1; fi
+  inner="$(find "$ROOT/jdk-extract" -maxdepth 1 -type d -name 'jdk-21*' | head -1)"
+  if [ -z "$inner" ]; then echo "[jdk] FAILED: no jdk-21* dir after extract"; ls -la "$ROOT/jdk-extract"; exit 1; fi
   rm -rf "$JDK_DIR"; mv "$inner" "$JDK_DIR"
   echo "[jdk] installed at $JDK_DIR"
 else
@@ -45,7 +45,7 @@ export PATH="$JDK_DIR/bin:$PATH"
 if [ ! -d "$SDK_DIR/cmdline-tools/latest/bin" ]; then
   if [ ! -s "$ROOT/cmdtools.zip" ]; then
     echo "[sdk] downloading cmdline-tools..."
-    curl -sL -o "$ROOT/cmdtools.zip" "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+    curl -fL --retry 3 -o "$ROOT/cmdtools.zip" "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
   fi
   rm -rf "$ROOT/cmdtools-extract"; mkdir -p "$ROOT/cmdtools-extract"
   unzip_ps "$ROOT/cmdtools.zip" "$ROOT/cmdtools-extract"
@@ -59,8 +59,8 @@ fi
 SDKMGR="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager.bat"
 echo "[sdk] accepting licenses..."
 yes | "$SDKMGR" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1
-echo "[sdk] installing platform-tools, platforms;android-35, build-tools;35.0.0 ..."
-"$SDKMGR" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+echo "[sdk] installing platform-tools, platforms;android-36, build-tools;36.0.0 ..."
+"$SDKMGR" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
 # ---------- 3. local.properties ----------
 WINSDK="$(echo "$SDK_DIR" | sed 's#/#\\\\#g')"
