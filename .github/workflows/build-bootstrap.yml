@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node (for the brain bundle + JS CLI)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -30,7 +30,7 @@ jobs:
         run: bash bootstrap/build.sh
 
       - name: Upload bootstrap-aarch64.zip
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bootstrap-aarch64
           path: app/src/main/assets/bootstrap-aarch64.zip
