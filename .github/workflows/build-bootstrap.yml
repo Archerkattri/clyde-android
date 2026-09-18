@@ -6,6 +6,11 @@
 # NOTE: the Node-from-source build for the custom prefix is heavy. If the standard runner OOMs or
 # times out, use a larger runner (runs-on: ubuntu-latest-8-cores) or self-hosted.
 name: Build embedded runtime
+
+permissions:
+  contents: read
+  actions: write
+
 on:
   workflow_dispatch:
 
