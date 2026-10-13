@@ -40,7 +40,21 @@ baselineProfile {
 }
 
 dependencies {
+    // Keep transitive build/runtime libraries at patched versions without adding unused libraries.
+    implementation(platform("io.netty:netty-bom:4.1.137.Final"))
+    constraints {
+        implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+        implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
+        implementation("com.squareup.wire:wire-runtime:6.4.5")
+        implementation("com.squareup.wire:wire-runtime-jvm:6.4.5")
+        implementation("org.bitbucket.b_c:jose4j:0.9.6")
+        implementation("org.jdom:jdom2:2.0.6.1")
+        implementation("org.apache.commons:commons-lang3:3.18.0")
+        implementation("org.apache.httpcomponents:httpclient:4.5.14")
+        implementation("org.apache.httpcomponents:httpmime:4.5.14")
+    }
+
     implementation("androidx.test.ext:junit:1.2.1")
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    implementation("androidx.benchmark:benchmark-macro-junit4:1.5.0-alpha06")
+    implementation("androidx.benchmark:benchmark-macro-junit4:1.5.0")
 }
