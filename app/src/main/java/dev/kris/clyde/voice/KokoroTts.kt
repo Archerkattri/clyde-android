@@ -77,15 +77,11 @@ object KokoroModel {
                     }
                 }
             }
-            // extract bz2 -> tar into filesDir (entries are prefixed with "$NAME/")
+            // The bundle contains a top-level "$NAME/" directory; extract its contents into that
+            // dedicated model directory after validating every entry and its destination.
             BZip2CompressorInputStream(tmp.inputStream().buffered()).use { bz ->
                 TarArchiveInputStream(bz).use { tar ->
-                    var e = tar.nextEntry
-                    while (e != null) {
-                        val f = File(ctx.filesDir, e.name)
-                        if (e.isDirectory) f.mkdirs() else { f.parentFile?.mkdirs(); f.outputStream().use { tar.copyTo(it) } }
-                        e = tar.nextEntry
-                    }
+                    SafeModelTarExtractor.extract(tar, dir(ctx))
                 }
             }
             return isReady(ctx)

@@ -133,7 +133,7 @@ dependencies {
     // is fetched from GitHub releases into app/libs/ (gitignored). The ~700 MB voice model is
     // downloaded on first use, not bundled. Get the AAR: scripts/fetch-sherpa-aar.sh (or the release URL).
     implementation(files("libs/sherpa-onnx-1.13.3.aar"))
-    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.apache.commons:commons-compress:1.28.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

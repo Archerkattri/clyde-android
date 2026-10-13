@@ -62,5 +62,5 @@ adversarial review; findings fixed and re-verified.
 - Multi-step UI automation is ~40–70% reliable — Clyde is supervised, not autonomous.
 - `tap`/`type`/`input_*` are not per-action confirmed (usability); they are bounded by hard
   stops + the halt flag, and the model is instructed to treat screen content as untrusted.
-- Verified by static analysis, unit tests, and runtime auth checks; full device bring-up
-  (voice, accessibility, Shizuku, overlay) is the user's on-device step.
+- The brain's TypeScript checks and runtime auth guards do not replace a full device bring-up;
+  voice, accessibility, Shizuku, and overlay behavior still need on-device verification.
