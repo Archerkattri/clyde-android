@@ -50,6 +50,7 @@ jobs:
               ./gradlew --no-daemon :app:dependencyInsight --configuration "$configuration" --dependency "$dependency"
             done
           done
+          ./gradlew --no-daemon :app:dependencies :baselineprofile:dependencies
           ./gradlew --no-daemon buildEnvironment :app:buildEnvironment :baselineprofile:buildEnvironment
       - name: Fetch verified Sherpa ONNX runtime
         run: ./scripts/fetch-sherpa-aar.sh
