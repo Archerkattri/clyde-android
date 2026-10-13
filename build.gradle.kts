@@ -66,7 +66,7 @@ val patchedToolingDependencies = mapOf(
     "unified-test-platform-android-test-plugin-result-listener-gradle" to patchedLintDependencies
 )
 
-project(":app") {
+allprojects {
     configurations.configureEach {
         patchedToolingDependencies[name]?.let { artifacts ->
             resolutionStrategy.force(*artifacts.toTypedArray())
