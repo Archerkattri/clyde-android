@@ -36,3 +36,28 @@ plugins {
     // Baseline-profile generation (Macrobenchmark). The 1.5.x line is aligned with AGP 9.
     id("androidx.baselineprofile") version "1.5.0" apply false
 }
+
+// AGP lint and Android test-platform configurations are created by plugins, outside app runtime.
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.force(
+            "io.netty:netty-common:4.1.137.Final",
+            "io.netty:netty-buffer:4.1.137.Final",
+            "io.netty:netty-transport:4.1.137.Final",
+            "io.netty:netty-transport-native-unix-common:4.1.137.Final",
+            "io.netty:netty-resolver:4.1.137.Final",
+            "io.netty:netty-codec:4.1.137.Final",
+            "io.netty:netty-codec-http:4.1.137.Final",
+            "io.netty:netty-codec-http2:4.1.137.Final",
+            "io.netty:netty-codec-socks:4.1.137.Final",
+            "io.netty:netty-handler:4.1.137.Final",
+            "io.netty:netty-handler-proxy:4.1.137.Final",
+            "org.bouncycastle:bcprov-jdk18on:1.85",
+            "org.bouncycastle:bcpkix-jdk18on:1.85",
+            "org.bouncycastle:bcutil-jdk18on:1.85",
+            "org.apache.commons:commons-lang3:3.18.0",
+            "org.apache.httpcomponents:httpclient:4.5.14",
+            "org.apache.httpcomponents:httpmime:4.5.14"
+        )
+    }
+}
