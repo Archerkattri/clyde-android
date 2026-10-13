@@ -46,9 +46,7 @@ jobs:
           for configuration in debugRuntimeClasspath releaseRuntimeClasspath; do
             for dependency in io.netty org.bouncycastle:bcprov-jdk18on org.apache.commons:commons-lang3 org.apache.httpcomponents:httpclient; do
               echo "== $configuration: $dependency =="
-              ./gradlew --no-daemon :app:dependencyInsight \\
-                --configuration "$configuration" \\
-                --dependency "$dependency"
+              ./gradlew --no-daemon :app:dependencyInsight --configuration "$configuration" --dependency "$dependency"
             done
           done
           ./gradlew --no-daemon buildEnvironment :app:buildEnvironment :baselineprofile:buildEnvironment
