@@ -36,3 +36,40 @@ plugins {
     // Baseline-profile generation (Macrobenchmark). The 1.5.x line is aligned with AGP 9.
     id("androidx.baselineprofile") version "1.5.0" apply false
 }
+
+// Pin only the AGP lint and Android test-platform graphs shown by dependencyInsight.
+val patchedNettyDependencies = listOf(
+    "io.netty:netty-common:4.1.137.Final",
+    "io.netty:netty-buffer:4.1.137.Final",
+    "io.netty:netty-transport:4.1.137.Final",
+    "io.netty:netty-transport-native-unix-common:4.1.137.Final",
+    "io.netty:netty-resolver:4.1.137.Final",
+    "io.netty:netty-codec:4.1.137.Final",
+    "io.netty:netty-codec-http:4.1.137.Final",
+    "io.netty:netty-codec-http2:4.1.137.Final",
+    "io.netty:netty-codec-socks:4.1.137.Final",
+    "io.netty:netty-handler:4.1.137.Final",
+    "io.netty:netty-handler-proxy:4.1.137.Final"
+)
+val patchedLintDependencies = listOf(
+    "org.bouncycastle:bcprov-jdk18on:1.85",
+    "org.bouncycastle:bcpkix-jdk18on:1.85",
+    "org.bouncycastle:bcutil-jdk18on:1.85",
+    "org.apache.commons:commons-lang3:3.18.0",
+    "org.apache.httpcomponents:httpclient:4.5.14",
+    "org.apache.httpcomponents:httpmime:4.5.14"
+)
+val patchedToolingDependencies = mapOf(
+    "androidLintTool" to patchedLintDependencies,
+    "unified-test-platform-core" to patchedNettyDependencies,
+    "unified-test-platform-android-test-plugin-host-emulator-control" to patchedNettyDependencies,
+    "unified-test-platform-android-test-plugin-result-listener-gradle" to patchedLintDependencies
+)
+
+allprojects {
+    configurations.configureEach {
+        patchedToolingDependencies[name]?.let { artifacts ->
+            resolutionStrategy.force(*artifacts.toTypedArray())
+        }
+    }
+}

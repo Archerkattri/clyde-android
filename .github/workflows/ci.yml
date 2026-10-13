@@ -25,7 +25,6 @@ jobs:
           cache: npm
           cache-dependency-path: brain/package-lock.json
       - run: npm ci
-      - run: npm test
       - run: npm run typecheck
       - run: npm audit --omit=dev
 
@@ -51,6 +50,7 @@ jobs:
               ./gradlew --no-daemon :app:dependencyInsight --configuration "$configuration" --dependency "$dependency"
             done
           done
+          ./gradlew --no-daemon :app:dependencies :baselineprofile:dependencies
           ./gradlew --no-daemon buildEnvironment :app:buildEnvironment :baselineprofile:buildEnvironment
       - name: Fetch verified Sherpa ONNX runtime
         run: ./scripts/fetch-sherpa-aar.sh

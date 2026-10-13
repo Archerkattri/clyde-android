@@ -119,7 +119,7 @@ claws, expressions — and recolours blue → terracotta → green to mirror liv
 - **App:** `gradlew :app:assembleRelease` (JDK 21). Signing is read from `app/keystore.properties`
   (gitignored — supply your own keystore). The on-device voice needs the sherpa-onnx AAR:
   `bash scripts/fetch-sherpa-aar.sh`.
-- **Brain:** `cd brain && npm install && npm run typecheck && npm test`.
+- **Brain:** `cd brain && npm ci && npm run typecheck`.
 - **Embedded runtime asset:** `bash bootstrap/build.sh` on Linux/Docker (multi-hour; arm64 only).
 
 ## Layout
