@@ -8,6 +8,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   brain:
@@ -40,6 +41,16 @@ jobs:
       - uses: android-actions/setup-android@v4
       - name: Install the declared Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Report vulnerable dependency paths
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          for configuration in debugRuntimeClasspath releaseRuntimeClasspath; do
+            for dependency in io.netty org.bouncycastle:bcprov-jdk18on org.apache.commons:commons-lang3 org.apache.httpcomponents:httpclient; do
+              echo "== $configuration: $dependency =="
+              ./gradlew --no-daemon :app:dependencyInsight --configuration "$configuration" --dependency "$dependency"
+            done
+          done
+          ./gradlew --no-daemon buildEnvironment :app:buildEnvironment :baselineprofile:buildEnvironment
       - name: Fetch verified Sherpa ONNX runtime
         run: ./scripts/fetch-sherpa-aar.sh
       - name: Build and lint the debug app
