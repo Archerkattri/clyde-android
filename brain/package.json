@@ -23,7 +23,7 @@
   "overrides": {
     "@hono/node-server": "^2.1.6",
     "fast-uri": "^3.1.9",
-    "hono": "^4.13.13",
+    "hono": "^4.13.18",
     "@modelcontextprotocol/sdk": "1.31.0",
     "proxy-addr": "2.0.8"
   }
